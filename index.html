@@ -311,6 +311,24 @@ body.noblur .tcard{backdrop-filter:none;-webkit-backdrop-filter:none;background:
 .cfBtns{display:flex;gap:9px}
 .cfBtns .btn,.cfBtns .btn.ghost{width:auto;flex:1;padding:11px;font-size:14px}
 
+/* ── 토스트 ── */
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(12px);z-index:1000;
+  background:rgba(75,21,40,.92);color:#fff;font-size:13.5px;line-height:1.5;padding:12px 18px;
+  border-radius:99px;max-width:calc(100% - 36px);text-align:center;pointer-events:none;
+  opacity:0;transition:opacity .2s ease,transform .2s ease}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── 공유받은 결과 화면 ── */
+.fromfriend{background:var(--rose-xl);border:1px solid var(--line-s);border-radius:14px;
+  padding:13px 15px;margin-bottom:16px;text-align:center}
+.fromfriend p{margin:0;font-size:13.5px;line-height:1.6;color:var(--rose-d)}
+.ctabox{position:sticky;bottom:12px;margin-top:26px;padding:14px;border-radius:16px;
+  background:rgba(255,255,255,.96);border:1px solid var(--line-s);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  box-shadow:0 8px 28px rgba(75,21,40,.18)}
+body.noblur .ctabox{backdrop-filter:none;-webkit-backdrop-filter:none;background:#fff}
+.ctabox p{margin:0 0 10px;text-align:center;font-size:13.5px;color:var(--ink2)}
+
 /* ── 강아지 매칭: 버튼 녹색 + 유리 텍스처 ── */
 body.theme-dog .btn{
   background:rgba(20,128,95,.82); border:1px solid rgba(20,128,95,.4);
@@ -6965,7 +6983,8 @@ function renderDogDetail(id){
    Crush Lab — 화면 흐름
    ========================================================= */
 const S = { stage:'intro', intro:{}, si:0, set:[], qi:0, ans:{}, chShown:{},
-            idealAsked:false, didIdeal:false, idealSet:[], ideal:{}, ii:0 };
+            idealAsked:false, didIdeal:false, idealSet:[], ideal:{}, ii:0,
+            friend:null };   // 공유 링크를 타고 들어온 경우 그 친구의 유형 코드
 const $ = id => document.getElementById(id);
 const app = () => $('app');
 
@@ -7277,6 +7296,12 @@ function renderResult(){
   h+='<div class="card" style="margin:20px 0 10px"><p style="margin:0;font-size:15px;line-height:1.78">'+esc(t.sum)+'</p>'+
      '<p class="muted" style="margin:12px 0 0;padding-top:11px;border-top:1px solid var(--line)">'+esc(t.why)+'</p></div>';
 
+  /* 친구 링크를 타고 들어왔으면, 그 친구와의 궁합을 먼저 보여준다 */
+  if(S.friend && TYPES[S.friend]){
+    h+=sec('링크 보내준 친구와의 궁합','네 결과랑 친구 결과를 맞춰본 거야')+
+       mrow({code:S.friend}, true, R.code);
+  }
+
   h+=sec(esc(t.name)+'의 성향 요약','이 유형 전체에 해당하는 얘기야')+'<div class="card deep">'+
      TYPE_DEEP[R.code].map((p,i)=>'<p class="dp'+(i?' dpn':'')+'">'+esc(p)+'</p>').join('')+'</div>';
 
@@ -7416,10 +7441,13 @@ function renderResult(){
 
   h+='<div class="card" style="margin:24px 0"><p style="margin:0;font-size:15px;line-height:1.78">'+esc(R.fearEcho)+'</p></div>';
 
-  h+=sec('저장해서 공유하기','')+
-     '<div style="display:flex;justify-content:center;margin-bottom:12px" id="cardBox">'+shareCard(R,t)+'</div>'+
-     '<button class="btn" onclick="saveCard()">이미지로 저장</button>'+
-     '<button class="btn ghost" style="margin-top:9px" onclick="renderCatalog()">16개 크리스탈 전부 보기</button>'+
+  h+=sec('친구한테 공유하기','링크를 받은 친구는 네 결과를 보고 바로 검사도 할 수 있어')+
+     '<div style="display:flex;justify-content:center;margin-bottom:12px">'+shareCard(R,t)+'</div>'+
+     (navigator.share ? '<button class="btn" onclick="shareNative()">결과 링크 보내기</button>'+
+                        '<button class="btn ghost" style="margin-top:9px" onclick="copyShareLink()">링크 복사</button>'
+                      : '<button class="btn" onclick="copyShareLink()">결과 링크 복사</button>')+
+     '<p class="muted" style="margin:10px 0 0;text-align:center">링크에는 크리스탈 유형과 축 그래프만 담겨. 네가 고른 답은 안 들어가.</p>'+
+     '<button class="btn ghost" style="margin-top:16px" onclick="renderCatalog()">16개 크리스탈 전부 보기</button>'+
      '<button class="btn ghost" style="margin-top:9px" onclick="retake()">다시 검사하기</button>';
   h+='</div>';
   app().innerHTML=h; window.scrollTo(0,0);
@@ -7490,18 +7518,164 @@ function shareCard(R,t){
     '<text x="170" y="322" text-anchor="middle" font-family="Pretendard,sans-serif" font-size="11" fill="'+t.rim+'" letter-spacing="1.5">CRUSH LAB · '+R.code+'</text>'+
   '</svg>';
 }
-function saveCard(){
-  const svg=$('scard'); const xml=new XMLSerializer().serializeToString(svg);
-  const img=new Image();
-  img.onload=function(){
-    const c=document.createElement('canvas'); c.width=1020; c.height=1020;
-    const g=c.getContext('2d'); g.scale(3,3); g.drawImage(img,0,0);
-    const a=document.createElement('a');
-    a.download='crushlab_'+TYPES[window.__R.code].name+'.png';
-    a.href=c.toDataURL('image/png'); a.click();
-  };
-  img.onerror=function(){ alert('저장에 실패했어. 화면을 캡처해서 써줘.'); };
-  img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(xml);
+/* =========================================================
+   결과 링크 공유
+   서버가 없으니 결과를 URL 자체에 담는다.
+   담는 건 유형 코드 + 축 4개 퍼센트 + (선택) 이상형 코드뿐.
+   개별 문항 답변은 넣지 않는다 — 링크를 받은 사람이
+   친구가 뭘 골랐는지까지 알 수 있으면 안 되니까.
+   ========================================================= */
+const SHARE_V = 1;                 // 페이로드 버전. 형식 바뀌면 올린다.
+const SHARE_CODES = allCodes();    // 인덱스 ↔ 코드 매핑 (고정 순서)
+
+function b64u(bytes){
+  let s=''; for(const b of bytes) s+=String.fromCharCode(b);
+  return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function unb64u(str){
+  let s=String(str).replace(/-/g,'+').replace(/_/g,'/');
+  while(s.length % 4) s+='=';
+  const bin=atob(s), out=[];
+  for(let i=0;i<bin.length;i++) out.push(bin.charCodeAt(i));
+  return out;
+}
+
+function encodeShare(R, idealCode){
+  const ci=SHARE_CODES.indexOf(R.code);
+  if(ci<0) return '';
+  const b=[SHARE_V, ci];
+  ['sp','ex','st','iv'].forEach(k=>{
+    const a=R.axisLines.find(x=>x.axis===k);
+    b.push(Math.max(0, Math.min(100, Math.round(a ? a.pct : 50))));
+  });
+  const ii=idealCode ? SHARE_CODES.indexOf(idealCode) : -1;
+  b.push(ii>=0 ? ii : 255);
+  return b64u(b);
+}
+
+function decodeShare(str){
+  try{
+    const b=unb64u(str);
+    if(b.length<6 || b[0]!==SHARE_V) return null;
+    const code=SHARE_CODES[b[1]];
+    if(!code) return null;
+    const pcts=[2,3,4,5].map(i=>{
+      const v=b[i];
+      return (typeof v==='number' && v>=0 && v<=100) ? v : 50;
+    });
+    const ideal=(b.length>6 && b[6]<16) ? SHARE_CODES[b[6]] : null;
+    return { code, pcts, ideal };
+  }catch(e){ return null; }
+}
+
+/* 공유 페이로드에서 shareCard·축그래프가 쓰는 최소 R을 만든다 */
+function shareStub(d){
+  return { code:d.code,
+           axisLines:['sp','ex','st','iv'].map((k,i)=>({ axis:k, pct:d.pcts[i] })) };
+}
+
+function shareUrl(R){
+  const idealCode = (S.didIdeal && S.idealSet.length) ? scoreIdeal(S.idealSet,S.ideal).code : null;
+  const q = encodeShare(R, idealCode);
+  return location.origin + location.pathname + '?r=' + q;
+}
+
+function toast(msg){
+  const old=document.querySelector('.toast'); if(old) old.remove();
+  const el=document.createElement('div');
+  el.className='toast'; el.textContent=msg;
+  document.body.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('on'));
+  setTimeout(()=>{ el.classList.remove('on'); setTimeout(()=>el.remove(),250); }, 2600);
+}
+
+function legacyCopy(text){
+  const ta=document.createElement('textarea');
+  ta.value=text; ta.setAttribute('readonly','');
+  ta.style.cssText='position:fixed;top:0;left:0;opacity:0';
+  document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+  let ok=false;
+  try{ ok=document.execCommand('copy'); }catch(e){ ok=false; }
+  ta.remove();
+  return ok;
+}
+
+function copyShareLink(){
+  if(!window.__R) return;
+  const url=shareUrl(window.__R);
+  const done=()=>toast('링크를 복사했어. 친구한테 붙여넣기만 하면 돼');
+  const fail=()=>customConfirm('복사가 안 됐어. 이 주소를 직접 복사해줘.\n\n'+url, ()=>{});
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(done, ()=>{ legacyCopy(url) ? done() : fail(); });
+  } else {
+    legacyCopy(url) ? done() : fail();
+  }
+}
+
+function shareNative(){
+  if(!window.__R) return;
+  const t=TYPES[window.__R.code];
+  navigator.share({
+    title: 'Crush Lab',
+    text: '나는 '+t.name+'('+t.gem+')래. 너는 어떤 크리스탈이야?',
+    url: shareUrl(window.__R)
+  }).catch(()=>{});
+}
+
+/* ---------- 공유받은 결과 화면 ---------- */
+function renderSharedResult(d){
+  setTheme(false);
+  S.friend = d.code;               // 검사를 마치면 이 친구와의 궁합을 보여준다
+  const t=TYPES[d.code], R=shareStub(d);
+
+  let h='<div class="screen">';
+  h+='<div class="fromfriend"><p>친구가 보낸 결과야. 아래로 내리면 너도 바로 검사할 수 있어.</p></div>';
+
+  h+='<div style="text-align:center">'+
+     '<div class="float" style="display:flex;justify-content:center;margin-bottom:10px">'+typeFairy(d.code,150)+'</div>'+
+     '<p class="muted" style="margin-bottom:4px">'+esc(t.gem)+'</p>'+
+     '<h1 class="tname">'+esc(t.name)+'</h1>'+
+     '<p class="tmz">'+esc(t.mz)+'</p>'+
+     '<p class="ttag">'+esc(t.tag)+'</p>'+
+     '<span class="chip">'+t.en+' · '+d.code+'</span></div>';
+
+  h+='<div class="card" style="margin:20px 0 10px"><p style="margin:0;font-size:15px;line-height:1.78">'+esc(t.sum)+'</p>'+
+     '<p class="muted" style="margin:12px 0 0;padding-top:11px;border-top:1px solid var(--line)">'+esc(t.why)+'</p></div>';
+
+  h+=sec('축은 이렇게 나왔대','')+'<div class="card">';
+  R.axisLines.forEach(a=>{
+    const A=AXES[a.axis];
+    h+='<div class="axis" style="margin-bottom:12px">'+
+       '<div class="axrow"><span>'+A.negLabel+'</span><b>'+A.name+'</b><span>'+A.posLabel+'</span></div>'+
+       '<div class="axbar"><div class="axfill" style="left:'+Math.min(50,a.pct)+'%;width:'+Math.abs(a.pct-50)+'%"></div></div>'+
+       '</div>';
+  });
+  h+='</div>';
+
+  h+=sec(esc(t.name)+'은 이런 유형이야','')+'<div class="card deep">'+
+     TYPE_DEEP[d.code].map((p,i)=>'<p class="dp'+(i?' dpn':'')+'">'+esc(p)+'</p>').join('')+'</div>';
+
+  if(d.ideal && TYPES[d.ideal]){
+    const IT=TYPES[d.ideal];
+    h+=sec('친구가 원하는 크리스탈','친구가 이상형 설문까지 한 결과야')+
+       '<div class="card" style="text-align:center">'+
+       '<div style="display:flex;justify-content:center;margin-bottom:8px">'+typeFairy(d.ideal,110)+'</div>'+
+       '<p class="muted" style="margin-bottom:2px">'+esc(IT.gem)+'</p>'+
+       '<p class="tname" style="font-size:24px;margin:0 0 4px">'+esc(IT.name)+'</p>'+
+       '<p class="tmz" style="font-size:13.5px;margin-bottom:5px">'+esc(IT.mz)+'</p>'+
+       '<span class="chip">'+d.ideal+'</span></div>';
+  }
+
+  h+='<div style="display:flex;justify-content:center;margin:22px 0 0">'+shareCard(R,t)+'</div>';
+
+  h+='<div class="ctabox">'+
+     '<p>너는 어떤 크리스탈일까?</p>'+
+     '<button class="btn" onclick="renderLoveIntro()">나도 검사해볼래</button>'+
+     '<button class="btn ghost" style="margin-top:9px" onclick="renderCatalog()">16개 크리스탈 먼저 구경하기</button>'+
+     '</div>';
+
+  h+='</div>';
+  app().innerHTML=h; window.scrollTo(0,0);
 }
 
 /* ---------- 시작 ---------- */
@@ -7516,7 +7690,16 @@ function liteCheck(){
     : false;
   if(!ok) document.body.classList.add('noblur');
 }
-window.addEventListener('DOMContentLoaded',()=>{ liteCheck(); seedStars(); renderHome(); });
+window.addEventListener('DOMContentLoaded',()=>{
+  liteCheck(); seedStars();
+  // ?r=... 로 들어왔으면 친구 결과 화면부터 띄운다. 잘못된 값이면 그냥 홈.
+  let shared=null;
+  try{
+    const p=new URLSearchParams(location.search).get('r');
+    if(p) shared=decodeShare(p);
+  }catch(e){ shared=null; }
+  if(shared) renderSharedResult(shared); else renderHome();
+});
 
 </script>
 </body>
