@@ -65,3 +65,13 @@ npm run dev      # http://localhost:4321
 
 v1 원본이다. GitHub Pages 데모(<https://t555-art.github.io/Crush-Lab/>)를 살려두려고 남겼다.
 Cloudflare로 옮기고 나면 지워도 된다. 문항 데이터는 이미 `src/data/` 로 옮겨놨다.
+
+### `.nojekyll` 은 왜 있나
+
+GitHub Pages는 기본적으로 저장소를 Jekyll로 빌드하는데, Jekyll은 `---` 로 시작하는
+파일을 YAML 설정으로 착각한다. Astro 파일이 전부 `---` 로 시작해서
+`Invalid YAML front matter` 오류로 GitHub Pages 빌드가 통째로 실패했다.
+
+`.nojekyll` 이 있으면 Jekyll 처리를 건너뛰고 파일을 그대로 서빙한다.
+v1 데모는 계속 살아 있고, v2는 Cloudflare가 따로 빌드한다.
+(GitHub Pages와 Cloudflare는 서로 무관하게 돈다)
