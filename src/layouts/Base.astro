@@ -1,0 +1,48 @@
+---
+import '../styles/app.css';
+
+interface Props {
+  title: string;
+  description?: string;
+  /** 카톡·인스타 공유 썸네일. 유형 페이지는 유형별 이미지를 넘긴다 */
+  image?: string;
+  /** 장면 화면처럼 스크롤이 없는 화면은 true */
+  fixed?: boolean;
+}
+
+const {
+  title,
+  description = '하루를 따라가며 알아보는 내 연애 성향. 아침부터 밤까지, 좋아하는 사람이 있는 하루.',
+  image = '/art/og/default.svg',
+  fixed = false,
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const ogImage = new URL(image, Astro.site);
+---
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{title}</title>
+  <meta name="description" content={description} />
+  <link rel="canonical" href={canonical} />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Crush Lab" />
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={description} />
+  <meta property="og:image" content={ogImage} />
+  <meta property="og:url" content={canonical} />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <meta name="theme-color" content="#FBFAF9" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+</head>
+<body>
+  <div class="app" data-fixed={fixed ? '' : undefined}>
+    <slot />
+  </div>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "crush-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --host",
+    "build": "astro build",
+    "preview": "astro preview --host",
+    "check": "astro check",
+    "check:questions": "node tools/check-coverage.mjs",
+    "art": "node tools/make-art-placeholders.mjs"
+  },
+  "dependencies": {
+    "astro": "^5.14.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}
