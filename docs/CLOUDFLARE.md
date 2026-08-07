@@ -2,70 +2,73 @@
 
 git에 푸시하면 자동으로 빌드·배포된다. **전부 무료고 카드 등록도 필요 없다.**
 
-## 지금 붙어 있는 방식
+## 방식: Workers + 정적 에셋
 
-**Pages 프로젝트**다. 서버에서 도는 코드는 없고,
-`npm run build` 가 만든 `dist/` 를 그대로 올린다.
+Cloudflare가 신규 프로젝트를 **Workers로만** 만들도록 바꿨다.
+대시보드 `Create application` 에 Pages 옵션이 더 이상 없다.
+(예전 문서나 블로그의 "Pages → Connect to Git" 안내는 이제 안 맞는다)
 
-Cloudflare가 Pages와 Workers를 통합하면서 생성 경로에 따라
-배포 명령이 Workers용(`wrangler deploy`)으로 잡히는 경우가 있다.
-그러면 아래 경고와 함께 실패한다.
+우리 사이트는 서버에서 도는 코드가 없다. `npm run build` 가 만든 `dist/` 를
+그대로 올리는 **정적 에셋 전용 Worker** 로 붙인다.
+
+## 처음 연결하기
+
+### 1. 계정
+
+<https://dash.cloudflare.com/sign-up> 에서 가입. 이메일만 있으면 된다.
+
+### 2. 프로젝트 생성
 
 ```
-It seems that you have run `wrangler deploy` on a Pages project,
-`wrangler pages deploy` should be used instead.
+Workers & Pages → Create application → Continue with GitHub
 ```
 
-Pages 프로젝트에는 반드시 `wrangler pages deploy` 를 써야 한다.
+1. GitHub 계정을 연결하고 `t555-art/Crush-Lab` 을 고른다
+   - 비공개 저장소여도 된다 (GitHub Pages와 달리 유료 플랜이 필요 없다)
+2. 빌드 설정을 아래처럼 넣는다
 
-## 설정
+   | 항목 | 값 |
+   | --- | --- |
+   | Build command | `npm run build` |
+   | Deploy command | `npx wrangler deploy` |
 
-### 저장소에 있는 것 (이미 되어 있음)
+   `Deploy command` 에 **`pages` 를 넣으면 안 된다.** 이건 Worker 프로젝트다.
+
+3. Deploy
+
+2~3분 뒤 `crush-lab.<계정>.workers.dev` 같은 주소가 나온다.
+
+### 3. 주소를 코드에 반영
+
+받은 주소를 `astro.config.mjs` 의 `site` 에 적는다.
+
+```js
+site: 'https://crush-lab.<계정>.workers.dev',
+```
+
+이 값으로 공유 링크와 카톡 썸네일 주소가 만들어진다. 틀리면 썸네일이 안 뜬다.
+
+## 저장소에 이미 되어 있는 것
 
 | 파일 | 역할 |
 | --- | --- |
-| `wrangler.toml` | `pages_build_output_dir = "dist"` |
+| `wrangler.toml` | 올릴 폴더가 `dist/` 라는 것 (`[assets]`) |
 | `.node-version` | 빌더가 Node 22를 쓰도록 (Astro 요구사항) |
-
-### 대시보드에서 맞춰야 하는 것
-
-```
-Workers & Pages → crush-lab → Settings → Build → Edit
-```
-
-| 항목 | 값 |
-| --- | --- |
-| Build command | `npm run build` |
-| Deploy command | `npx wrangler pages deploy dist --project-name=crush-lab` |
-
-배포 명령에 **`pages` 가 빠져 있으면** Workers 배포로 동작해서 실패한다.
-이게 가장 흔한 함정이다.
-
-**고친 뒤에는 재배포해야 반영된다.**
-`Deployments` 탭 → 최신 배포 → `Retry deployment`
-
-### 그래도 안 되면: 프로젝트를 새로 만든다
-
-설정이 꼬였을 때는 고치는 것보다 다시 만드는 게 빠르다. 데이터가 없어서 잃을 게 없다.
-
-1. `Settings → 맨 아래 Delete project`
-2. `Workers & Pages → Create → Pages 탭 → Connect to Git`
-   — **반드시 Pages 탭에서** 시작할 것. "Import a repository" 로 들어가면
-   Workers 쪽으로 만들어져서 같은 문제가 반복된다.
-3. 빌드 설정은 `npm run build` / `dist` 만 넣으면 된다.
-   이 경로로 만들면 배포 명령은 Cloudflare가 알아서 처리한다.
 
 ## 빌드가 실패하면
 
-`Deployments` 탭 → 실패한 배포 클릭 → 로그를 펼쳐서 마지막 에러를 본다.
+`Deployments` 탭 → 실패한 배포 클릭 → 로그를 펼쳐서 **마지막 에러 줄**을 본다.
 
-| 로그에 보이는 것 | 원인 | 고치는 법 |
+| 로그에 보이는 것 | 원인 | 조치 |
 | --- | --- | --- |
 | `npm error engine` / `Unsupported engine` | 빌더 Node 버전이 낮음 | `.node-version` 이 저장소에 있는지 확인. 안 되면 환경변수 `NODE_VERSION=22.16.0` 추가 |
-| `Missing entry-point ... or to assets directory` | `dist/` 가 없거나 못 찾음 | 빌드 명령이 `npm run build` 로 들어가 있는지 확인 |
-| `Could not resolve ...` | 의존성 문제 | 로컬에서 `npm ci && npm run build` 로 재현되는지 확인 |
+| `Missing entry-point to Worker script or to assets directory` | `dist/` 가 없음 | 빌드 명령이 `npm run build` 인지 확인 |
+| `you have run 'wrangler deploy' on a Pages project` | 예전에 만든 Pages 프로젝트가 같은 이름으로 남아 있음 | 그 프로젝트를 지우고 다시 만들거나, `wrangler.toml` 의 `name` 을 바꾼다 |
 
 환경변수 넣는 곳: `Settings → Variables and Secrets → Add`
+
+설정을 고친 뒤에는 **재배포해야 반영된다.**
+`Deployments` 탭 → 최신 배포 → `Retry deployment`
 
 ## 배포가 됐는지 확인
 
@@ -76,17 +79,7 @@ Workers & Pages → crush-lab → Settings → Build → Edit
 | 회색 바탕에 "좋아하는 사람이 있는 하루를 따라가 볼래?" | v2. 정상 |
 | 분홍 유리 느낌에 "Crush Lab" 큰 글씨 | v1. 빌드가 안 돌고 저장소 루트가 그대로 서빙된 것 |
 
-`/type/FDOA/` 같은 주소가 열리는지도 확인하면 확실하다. 유형 페이지 16개가 있어야 정상이다.
-
-## 주소를 코드에 반영
-
-실제로 받은 주소를 `astro.config.mjs` 의 `site` 에 적는다.
-
-```js
-site: 'https://crush-lab.<계정>.workers.dev',
-```
-
-이 값으로 공유 링크와 카톡 썸네일 주소가 만들어진다. 틀리면 썸네일이 안 뜬다.
+`/type/FDOA/` 도 열리는지 보면 확실하다. 유형 페이지 16개가 있어야 정상이다.
 
 ## 무료 한도
 
@@ -94,7 +87,7 @@ site: 'https://crush-lab.<계정>.workers.dev',
 | --- | --- |
 | 정적 에셋 요청 | 무제한 |
 | Worker 요청 | 하루 100,000건 |
-| 빌드 | 월 500회 (하루 16회) |
+| 빌드 시간 | 월 3,000분 (우리 빌드는 2초) |
 
 ## 도메인은 나중에
 
