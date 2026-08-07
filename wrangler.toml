@@ -1,18 +1,21 @@
-# Cloudflare Pages 설정
+# Cloudflare 배포 설정 — Workers + 정적 에셋
 #
-# 이 프로젝트는 Pages 프로젝트다.
-# (배포 로그에 "you have run `wrangler deploy` on a Pages project" 경고가 뜨는 게 근거)
+# Cloudflare가 신규 프로젝트를 Workers로만 만들도록 바꿨다.
+# 대시보드에 Pages 생성 옵션이 더 이상 없어서 이 방식으로 간다.
+# (그래서 pages_build_output_dir 이 아니라 [assets] 를 쓴다)
 #
-# 서버에서 도는 코드는 없다. `npm run build` 가 만든 dist/ 를 그대로 올린다.
-# Workers용 [assets] 블록은 여기서 쓰면 안 된다 — Pages는 pages_build_output_dir 을 본다.
+# 서버에서 도는 코드는 없다. `npm run build` 가 만든 dist/ 를 그대로 서빙한다.
+# 정적 파일만 올리는 Worker는 main = "..." 이 필요 없다.
 #
-# 대시보드에서 맞춰야 하는 것 두 가지:
+# 대시보드에서 맞춰야 하는 것:
 #   Build command   : npm run build
-#   Deploy command  : npx wrangler pages deploy dist --project-name=crush-lab
+#   Deploy command  : npx wrangler deploy
 #
-# 배포 명령이 `npx wrangler deploy` (pages 빠짐) 로 되어 있으면
-# Workers 배포로 동작해서 실패한다.
+# 옵션은 일부러 최소로 뒀다. 배포가 한 번 성공한 뒤에
+# 404 처리(not_found_handling) 같은 걸 얹는다.
 
 name = "crush-lab"
 compatibility_date = "2026-08-07"
-pages_build_output_dir = "dist"
+
+[assets]
+directory = "./dist"
