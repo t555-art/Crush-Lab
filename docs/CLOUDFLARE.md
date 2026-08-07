@@ -17,15 +17,41 @@
 
    | 항목 | 값 |
    | --- | --- |
-   | Framework preset | `Astro` |
    | Build command | `npm run build` |
    | Build output directory | `dist` |
    | Root directory | (비워둠) |
+
+   `Framework preset` 은 위 두 칸을 자동으로 채워주는 단축키일 뿐이다. 없어도 상관없다.
 
 4. **Save and Deploy**
 
 2~3분 뒤 `crush-lab.pages.dev` 같은 주소가 나온다.
 프로젝트 이름을 바꾸면 주소도 같이 바뀐다.
+
+### 생성 화면에 빌드 설정 칸이 안 보이면
+
+대시보드 버전에 따라 접혀 있거나 자동감지로 숨겨진다. 그냥 기본값으로 배포한 뒤
+아래 경로에서 고치면 된다.
+
+```
+Workers & Pages → Crush-Lab → Settings → Build → Build configuration → Edit
+```
+
+**고친 뒤에는 반드시 재배포해야 반영된다.**
+`Deployments` 탭 → 최신 배포 → `Retry deployment`
+
+### 빌드가 제대로 돌았는지 확인하는 법
+
+배포 주소를 열어서 첫 화면을 본다.
+
+| 보이는 화면 | 뜻 |
+| --- | --- |
+| 회색 바탕에 "좋아하는 사람이 있는 하루를 따라가 볼래?" | v2. 정상 |
+| 분홍색 유리 느낌에 "Crush Lab" 큰 글씨 | v1. **빌드가 안 돌았다** |
+
+빌드 명령이 비어 있으면 Cloudflare가 저장소 루트를 그대로 서빙하는데,
+거기 v1 `index.html` 이 있어서 배포는 성공한 것처럼 보이지만 옛날 사이트가 뜬다.
+이때는 위의 Build configuration 을 채우고 재배포하면 된다.
 
 ## 3. 주소를 코드에 반영
 

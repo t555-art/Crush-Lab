@@ -1,0 +1,11 @@
+# Cloudflare Pages 설정
+#
+# 대시보드에서 "Build output directory" 를 여기 값으로 읽어간다.
+# 대시보드 설정을 깜빡해도 최소한 출력 폴더는 맞게 잡히도록 저장소에 박아둔다.
+#
+# 다만 "Build command"(npm run build) 는 여전히 대시보드에서 넣어야 한다.
+# Settings → Build → Build configuration → Edit
+
+name = "crush-lab"
+compatibility_date = "2026-08-07"
+pages_build_output_dir = "dist"
