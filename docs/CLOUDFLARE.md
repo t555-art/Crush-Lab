@@ -40,6 +40,23 @@ Workers & Pages → Crush-Lab → Settings → Build → Build configuration →
 **고친 뒤에는 반드시 재배포해야 반영된다.**
 `Deployments` 탭 → 최신 배포 → `Retry deployment`
 
+### 빌드가 실패하면
+
+**1순위: Node 버전.** Astro는 Node 18.20.8 이상을 요구하는데
+Cloudflare 빌더 기본값이 그보다 낮아서 설치 단계에서 터진다.
+
+저장소에 `.node-version` 파일(내용 `22`)을 넣어뒀으니 보통은 이걸로 해결된다.
+그래도 안 되면 대시보드에서 환경변수를 직접 준다.
+
+```
+Settings → Variables and Secrets → Add
+  이름: NODE_VERSION
+  값:   22.16.0
+```
+
+**빌드 로그 보는 곳** — `Deployments` 탭 → 실패한 배포 클릭 → 로그가 펼쳐진다.
+`npm error engine` 이나 `Unsupported engine` 이 보이면 Node 버전 문제가 맞다.
+
 ### 빌드가 제대로 돌았는지 확인하는 법
 
 배포 주소를 열어서 첫 화면을 본다.
