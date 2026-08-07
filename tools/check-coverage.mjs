@@ -41,7 +41,22 @@ const combos = fields.reduce(
   [{}]
 );
 
+/* 축별 최소 출제량.
+   자리·단계 필터가 촘촘해지면 특정 축을 재는 문항이 통째로 빠질 수 있다.
+   그러면 score.ts 의 normalize 에서 room<=0 이 되어 그 축이 0으로 눌리고,
+   결과 코드의 그 자리는 사실상 동전 던지기가 된다. 그래서 하한을 둔다.
+   축이 4개인데 문항이 35개니, 축당 8개는 실제로 재고 있어야 한다. */
+const AXIS_KEYS = ['sp', 'ex', 'st', 'iv'];
+const MIN_PER_AXIS = 8;
+
+/** 이 문항이 그 축을 실제로 재는가 (선택지마다 점수가 갈려야 잰다고 본다) */
+function measures(q, k) {
+  const vals = q.o.map(o => (o.s && o.s[k]) || 0);
+  return Math.max(...vals) !== Math.min(...vals);
+}
+
 let short = [], counts = new Map(), codes = new Set(), errors = [];
+let thin = [], axisMin = { sp: 99, ex: 99, st: 99, iv: 99 };
 for (const intro of combos) {
   try {
     const scenes = resolveScenes(SCENES, intro);
@@ -61,6 +76,13 @@ for (const intro of combos) {
       answers[b.question.id] = Math.floor(Math.random() * b.question.o.length);
     }
     codes.add(score(asked, answers).code);
+
+    // 축별로 몇 문항이 실제로 재고 있는지
+    for (const k of AXIS_KEYS) {
+      const c = asked.filter(q => measures(q, k)).length;
+      if (c < axisMin[k]) axisMin[k] = c;
+      if (c < MIN_PER_AXIS) thin.push({ intro, axis: k, count: c });
+    }
   } catch (e) {
     errors.push(`${JSON.stringify(intro)} :: ${e.message}`);
   }
@@ -72,7 +94,18 @@ console.log('출제 개수 분포:', [...counts.entries()].sort((a, b) => a[0] -
 console.log('문항이 모자란 조합:', short.length);
 if (short.length) console.log('  예시:', JSON.stringify(short[0]));
 console.log('도달한 유형 코드:', codes.size, '/ 16');
-console.log('오류:', errors.length, errors.slice(0, 3));
+
+console.log(`\n축별 최소 출제량 (하한 ${MIN_PER_AXIS}개)`);
+for (const k of AXIS_KEYS) {
+  const ok = axisMin[k] >= MIN_PER_AXIS;
+  console.log(`  ${k}  최소 ${String(axisMin[k]).padStart(2)}문항  ${ok ? 'OK' : '← 부족'}`);
+}
+if (thin.length) {
+  console.log(`  하한 미달 조합 ${thin.length}건. 예시:`, JSON.stringify(thin[0]));
+  console.log('  → 그 축이 0으로 눌려 판정이 무작위가 된다. scenes.ts 의 stages/accepts 를 넓힐 것.');
+}
+
+console.log('\n오류:', errors.length, errors.slice(0, 3));
 
 rmSync(tmp, { recursive: true, force: true });
-process.exit(short.length || errors.length ? 1 : 0);
+process.exit(short.length || errors.length || thin.length ? 1 : 0);

@@ -12,12 +12,14 @@
     "preview": "astro preview --host",
     "check": "astro check",
     "check:questions": "node tools/check-coverage.mjs",
+    "tag:where": "node tools/tag-where.mjs",
     "art": "node tools/make-art-placeholders.mjs"
   },
   "dependencies": {
     "astro": "^5.14.1"
   },
   "devDependencies": {
+    "esbuild": "^0.27.7",
     "typescript": "^5.9.2"
   }
 }

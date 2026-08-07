@@ -48,8 +48,13 @@ export interface Need {
 
 export interface Question {
   id: string;
-  /** v1의 챕터 번호(1~7). v2에서는 장면 매핑의 힌트로만 쓴다 */
+  /** v1의 챕터 번호(1~7). 관계 단계를 뜻한다 (1 나 → 7 이별) */
   ch: number;
+  /**
+   * 이 문항을 어느 자리에서 물을 수 있는가.
+   * 없으면 'any' 로 본다 — 뒤늦게 태그를 붙여도 기존 문항이 안 깨지게.
+   */
+  where?: Where;
   q: string;
   o: Choice[];
   need?: Need;
@@ -64,6 +69,38 @@ export interface Question {
 export type BankId =
   | 'ch1-me' | 'ch2-pull' | 'ch3-crush' | 'ch4-some'
   | 'ch5-ask' | 'ch6-dating' | 'ch7-after' | 'pool-extra';
+
+/* ── 자리 (v2.1 신규) ─────────────────────────────────── */
+
+/**
+ * 이 문항이 성립하려면 어떤 자리에 있어야 하는가.
+ *
+ * 뱅크(ch1~ch7)가 "관계 단계"로 나눠져 있는 것과 별개의 축이다.
+ * 뱅크만으로 장면을 채우면 하루 안에 연애 전체 아크가 들어가버려서
+ * 17:40 하굣길에서 "사귄 지 한 달" 을 묻는 일이 생긴다.
+ *
+ * 'any' 가 기본값이고 실제로 대다수다 — "고백은 누가 하는 게 맞다고 봐?"
+ * 같은 의견·경험형은 아침이든 밤이든 물어도 어색하지 않다.
+ * 구체적인 상황을 그리는 문항만 자리를 지정한다.
+ */
+export type Where =
+  /** 아무 데서나. 의견·성향·과거 경험을 묻는 문항 */
+  | 'any'
+  /** 내 방·침대. 혼자 있는 시간, 등교 준비, 잠들기 전 */
+  | 'room'
+  /** 오가는 길. 등하굣길·버스·편의점·우산 */
+  | 'road'
+  /** 교실. 수업·자습·쉬는 시간·짝꿍 */
+  | 'class'
+  /** 급식실·매점. 밥 먹는 자리 */
+  | 'meal'
+  /** 복도·사물함·계단. 스쳐 지나가는 자리 */
+  | 'hall'
+  /** 폰 안에서 벌어지는 일. 톡·DM·스토리·읽음 표시 */
+  | 'phone';
+
+export const WHERE_KEYS: Where[] =
+  ['any', 'room', 'road', 'class', 'meal', 'hall', 'phone'];
 
 /* ── 자기소개 ─────────────────────────────────────────── */
 export interface IntroOption { v: string; t: string; ic?: string }
@@ -87,12 +124,18 @@ export interface ArtSlot {
 
 /**
  * 문항 자리.
- * id를 주면 그 문항으로 고정, 안 주면 뱅크에서 알고리즘이 고른다.
+ *
+ * 아무것도 안 주면 그 장면의 accepts 에 맞는 문항 전체에서 고른다.
  * 문항 선택 규칙을 바꾸고 싶으면 engine/select.ts 만 고치면 된다.
  */
 export interface QuestionSlot {
-  from: BankId;
+  /** 이 문항으로 고정한다 */
   id?: string;
+  /**
+   * 관계 단계를 이 뱅크로 제한한다.
+   * 안 주면 단계를 안 가리고 장면에 맞는 것 중에서 고른다.
+   */
+  from?: BankId;
 }
 
 export type Beat =
@@ -110,6 +153,20 @@ export interface Scene {
   /** '내 방' */
   place: string;
   title: string;
+  /**
+   * 이 장면에서 물어도 되는 자리 태그.
+   * 'any' 를 빼면 그 장면은 장소 특정 문항만 받는다 (보통은 넣어둔다).
+   * 장면에 맞는 문항을 바꾸고 싶으면 문항을 다시 태깅하는 대신 여기를 손보면 된다.
+   */
+  accepts: Where[];
+  /**
+   * 이 장면이 다루는 관계 단계 = 문항의 ch (1 나 → 7 이별).
+   *
+   * 뱅크 파일이 아니라 ch 로 거른다는 게 중요하다.
+   * pool-extra 에도 ch 가 붙어 있어서, 이렇게 해야 그 안의 문항들이 같이 뽑힌다.
+   * 여러 개를 적으면 섞어서 낸다.
+   */
+  stages: number[];
   art: ArtSlot;
   beats: Beat[];
 }

@@ -1,5 +1,7 @@
-import type {
-  Answers, BankId, IntroAnswers, Question, ResolvedScene, Scene,
+import {
+  AXIS_KEYS,
+  type Answers, type AxisKey, type BankId, type IntroAnswers,
+  type Question, type ResolvedScene, type Scene, type Where,
 } from './types';
 
 import ch1 from '../data/questions/ch1-me.json';
@@ -17,12 +19,25 @@ import extra from '../data/questions/pool-extra.json';
  * ★ 문항 뽑는 규칙을 바꾸고 싶으면 이 파일만 고치면 된다.
  *   장면(data/scenes.ts)도 채점(score.ts)도 안 건드려도 된다.
  *
- * 지금 규칙은 일부러 단순하게 뒀다 —
- *   1. 자기소개 조건(need)에 맞는 문항만 남긴다
- *   2. 조건이 붙은 문항을 먼저 쓴다 (개인화가 눈에 보이게)
- *   3. 나머지는 시드 기반 무작위
- * v1의 챕터 할당량·미러쌍 강제 같은 건 아직 안 옮겼다.
- * 문항 내용이 확정되면 그때 필요한 규칙만 골라서 되살리는 게 낫다.
+ * ── 두 축으로 거른다 ────────────────────────────────────
+ *
+ * 예전에는 "이 장면은 이 뱅크에서" 로 못박혀 있었다. 뱅크는 관계 단계라서
+ * 시간대와 축이 달랐고, 그 결과 하굣길에서 "사귄 지 한 달" 을 묻고
+ * 아침 침대에서 "급식 줄에서" 를 물었다. 그래서 축을 분리했다.
+ *
+ *   자리(where)  ← 하드 필터. 장면의 accepts 에 없는 자리의 문항은 절대 안 나온다.
+ *   단계(ch)     ← 장면의 stages 와 맞는 것을 먼저 쓴다. 모자라면 완화한다.
+ *
+ * 자리를 하드로 두는 이유: 급식실 문항이 새벽 침대에 뜨는 건 바로 눈에 띈다.
+ * 단계를 소프트로 두는 이유: 하드로 걸면 특정 자기소개 조합에서 문항이 말라
+ * 검사 길이가 사람마다 달라진다 (그러면 채점이 흔들린다).
+ *
+ * ── 우선순위 4층 ────────────────────────────────────────
+ *   1. 자리 특정 + 단계 일치   그 장면을 위해 쓰인 것 같은 문항
+ *   2. 단계 일치 (자리 any)    맥락은 맞고 자리는 안 타는 문항
+ *   3. 자리 특정 + 단계 불일치  자리는 맞는데 단계가 어긋남
+ *   4. 나머지                  자리가 빌 바에는 이거라도
+ * 각 층 안에서는 need(자기소개 조건)가 붙은 문항을 먼저 쓴다 — 개인화가 보이게.
  */
 
 export const BANKS: Record<BankId, Question[]> = {
@@ -82,6 +97,48 @@ export function seedFrom(intro: IntroAnswers): number {
   return h >>> 0;
 }
 
+/** 문항의 자리. 태그가 없으면 아무 데서나 물어도 되는 것으로 본다 */
+export const whereOf = (q: Question): Where => q.where ?? 'any';
+
+/** 이 장면에서 이 문항을 물어도 되는가 (하드 필터) */
+export function fitsPlace(q: Question, scene: Scene): boolean {
+  const w = whereOf(q);
+  return w === 'any' || scene.accepts.includes(w);
+}
+
+/**
+ * 이 문항이 그 축을 실제로 재는가.
+ * 선택지끼리 점수가 갈려야 잰다고 본다 — 전부 같은 값이면 뭘 골라도 결과가 같다.
+ */
+export function measures(q: Question, k: AxisKey): boolean {
+  let lo = Infinity, hi = -Infinity;
+  for (const o of q.o) {
+    const v = o.s?.[k] ?? 0;
+    if (v < lo) lo = v;
+    if (v > hi) hi = v;
+  }
+  return lo !== hi;
+}
+
+/**
+ * 축당 최소 몇 문항이 재고 있어야 하는가.
+ *
+ * 이 하한을 깨면 score.ts 의 normalize 에서 room<=0 이 되어 그 축이 0으로 눌리고,
+ * 유형 코드의 그 자리가 사실상 동전 던지기가 된다.
+ * 자리(where) 필터를 세게 걸수록 위험해진다 —
+ * 예를 들어 phone 태그 문항은 sp(속도)를 14%밖에 안 잰다.
+ */
+const MIN_PER_AXIS = 8;
+
+/**
+ * 한 장면이 장소 특정 문항으로만 채워지는 걸 막는 상한.
+ *
+ * 자리가 맞는 문항을 무조건 앞에 세우면, 태그를 많이 가진 자리가 장면을 독점한다.
+ * (phone 태그가 22개라 밤 장면 5칸이 전부 "읽씹·스토리" 로 채워졌었다)
+ * 장면 맛은 두세 개면 충분히 나고, 나머지는 폭이 넓은 편이 낫다.
+ */
+const PLACE_CAP = 3;
+
 /**
  * 장면들의 문항 자리를 실제 문항으로 채운다.
  * 같은 문항이 두 번 나오지 않게 전역으로 중복을 막는다.
@@ -94,23 +151,48 @@ export function resolveScenes(
   const rnd = mulberry32(seed);
   const used = new Set<string>();
 
-  /** 뱅크별로 미리 섞어두고 앞에서부터 꺼내 쓴다 */
-  const queues = new Map<BankId, Question[]>();
-  const queueFor = (bank: BankId): Question[] => {
-    let q = queues.get(bank);
+  /* 자기소개 조건을 통과한 문항. 장면마다 다시 거를 필요가 없으니 한 번만 계산한다 */
+  const pool = ALL_QUESTIONS.filter(x => matches(x, intro));
+
+  /** 장면별로 우선순위대로 줄을 세워두고 앞에서부터 꺼내 쓴다 */
+  const queues = new Map<string, Question[]>();
+  const queueFor = (scene: Scene, bank?: BankId): Question[] => {
+    const key = scene.id + (bank ? '/' + bank : '');
+    let q = queues.get(key);
     if (!q) {
-      const avail = (BANKS[bank] ?? []).filter(x => matches(x, intro));
-      // 조건부 문항을 앞에 둬서 개인화가 실제로 드러나게 한다
-      const targeted = shuffle(avail.filter(x => x.need), rnd);
-      const general = shuffle(avail.filter(x => !x.need), rnd);
-      q = [...targeted, ...general];
-      queues.set(bank, q);
+      let avail = pool.filter(x => fitsPlace(x, scene));
+      // slot.from 으로 단계를 못박은 자리는 그 뱅크 안에서만 고른다
+      if (bank) {
+        const ids = new Set((BANKS[bank] ?? []).map(x => x.id));
+        avail = avail.filter(x => ids.has(x.id));
+      }
+
+      const staged = (x: Question) => scene.stages.includes(x.ch);
+      const placed = (x: Question) => whereOf(x) !== 'any';
+
+      // 같은 층 안에서는 need 붙은 것을 앞에 — 개인화가 실제로 드러나게 한다
+      const tier = (rows: Question[]) => [
+        ...shuffle(rows.filter(x => x.need), rnd),
+        ...shuffle(rows.filter(x => !x.need), rnd),
+      ];
+
+      // 자리가 딱 맞는 문항은 앞에 세우되 PLACE_CAP 개까지만.
+      // 넘치는 건 뒤로 미뤄서, 장면이 한 태그로 도배되지 않게 한다.
+      const spot = tier(avail.filter(x => placed(x) && staged(x)));
+      q = [
+        ...spot.slice(0, PLACE_CAP),
+        ...tier(avail.filter(x => !placed(x) && staged(x))),
+        ...spot.slice(PLACE_CAP),
+        ...tier(avail.filter(x => placed(x) && !staged(x))),
+        ...tier(avail.filter(x => !placed(x) && !staged(x))),
+      ];
+      queues.set(key, q);
     }
     return q;
   };
 
-  const take = (bank: BankId): Question | null => {
-    const q = queueFor(bank);
+  const take = (scene: Scene, bank?: BankId): Question | null => {
+    const q = queueFor(scene, bank);
     while (q.length) {
       const next = q.shift()!;
       if (!used.has(next.id)) {
@@ -118,12 +200,16 @@ export function resolveScenes(
         return next;
       }
     }
-    // 뱅크가 말랐으면 여분 풀에서 메운다
-    if (bank !== 'pool-extra') return take('pool-extra');
-    return null;
+    // 뱅크를 못박은 자리가 말랐으면 장면 전체 후보로 넓혀서 다시 시도한다
+    return bank ? take(scene) : null;
   };
 
-  return scenes.map(scene => ({
+  /* ── 1차: 자리·단계 우선순위대로 채운다 ────────────────
+     여기까지는 몰입도(장면과 문항이 맞는지)만 본다. */
+  type Filled = { scene: Scene; question: Question; pinned: boolean };
+  const filled: Filled[] = [];
+
+  const out = scenes.map(scene => ({
     id: scene.id,
     time: scene.time,
     place: scene.place,
@@ -138,14 +224,63 @@ export function resolveScenes(
         const fixed = ALL_QUESTIONS.find(x => x.id === beat.slot.id);
         if (fixed && !used.has(fixed.id)) {
           used.add(fixed.id);
-          return [{ kind: 'question' as const, question: fixed }];
+          const slot = { kind: 'question' as const, question: fixed };
+          filled.push({ scene, question: fixed, pinned: true });
+          return [slot];
         }
       }
-      const picked = take(beat.slot.from);
+      const picked = take(scene, beat.slot.from);
       // 채울 문항이 없으면 그 자리는 조용히 건너뛴다 (빈 화면보다 낫다)
-      return picked ? [{ kind: 'question' as const, question: picked }] : [];
+      if (!picked) return [];
+      const slot = { kind: 'question' as const, question: picked };
+      filled.push({ scene, question: picked, pinned: false });
+      return [slot];
     }),
   }));
+
+  /* ── 2차: 모자란 축만 메운다 ───────────────────────────
+     1차는 자리를 맞추는 데만 신경 써서, 특정 축을 아무도 안 재는 세트가 나올 수 있다.
+     (아침·교실·밤이 phone/room 문항으로 채워지면 sp 를 재는 문항이 거의 안 남는다)
+
+     그래서 여기서는 하한에 못 미친 축이 있을 때만, 그 축을 안 재는 문항 하나를
+     같은 장면의 다른 후보(자리 조건은 그대로 지킨다)로 바꿔 끼운다.
+     하한을 넘겼으면 아무것도 안 한다 — 몰입도를 괜히 깎지 않는다. */
+  const count = (k: AxisKey) => filled.reduce((n, f) => n + (measures(f.question, k) ? 1 : 0), 0);
+
+  for (const k of AXIS_KEYS) {
+    let guard = 40;   // 후보가 없으면 못 채운다. 무한루프만 막는다
+    while (count(k) < MIN_PER_AXIS && guard-- > 0) {
+      // 바꿔도 손해가 제일 적은 자리를 고른다.
+      // = 그 축을 안 재면서, 다른 모자란 축도 안 재는 문항
+      const lacking = AXIS_KEYS.filter(a => count(a) < MIN_PER_AXIS);
+      let victim: Filled | null = null, victimCost = Infinity, swap: Question | null = null;
+
+      for (const f of filled) {
+        if (f.pinned || measures(f.question, k)) continue;
+        const cost = lacking.filter(a => measures(f.question, a)).length;
+        if (cost >= victimCost) continue;
+
+        // 같은 장면에서, 자리 조건을 지키면서 그 축을 재는 미사용 후보
+        const cand = queueFor(f.scene).find(x => !used.has(x.id) && measures(x, k));
+        if (!cand) continue;
+
+        victim = f; victimCost = cost; swap = cand;
+      }
+      if (!victim || !swap) break;
+
+      // 실제 교체 — out 안의 해당 문항을 갈아끼운다
+      for (const s of out) {
+        for (const b of s.beats) {
+          if (b.kind === 'question' && b.question === victim.question) b.question = swap;
+        }
+      }
+      used.delete(victim.question.id);
+      used.add(swap.id);
+      victim.question = swap;
+    }
+  }
+
+  return out;
 }
 
 /** 진행률 표시용 — 실제로 출제된 문항 수 */

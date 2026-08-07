@@ -37,6 +37,7 @@ npm run dev      # http://localhost:4321
 | `npm run build` | `dist/` 에 정적 HTML을 뽑는다 |
 | `npm run preview` | 빌드 결과를 그대로 확인 |
 | `npm run check:questions` | **문항 손봤으면 꼭 돌릴 것** (4,800조합 검사) |
+| `npm run tag:where` | 문항의 자리 태그 재판정. 인자 없이 돌리면 검토용 출력만 |
 | `npm run art` | 그림 자리표시자와 `docs/ART-MANIFEST.md` 재생성 |
 
 ## 어디를 고치면 되나
@@ -44,11 +45,28 @@ npm run dev      # http://localhost:4321
 | 하고 싶은 것 | 고칠 파일 |
 | --- | --- |
 | 대사·지문 바꾸기 | `src/data/scenes.ts` |
+| **장면에 나오는 문항 바꾸기** | `src/data/scenes.ts` 의 `accepts` / `stages` |
 | 문항 내용 바꾸기 | `src/data/questions/*.json` |
+| 문항 자리 태그 고치기 | `tools/tag-where.mjs` 의 `OVERRIDE` → `npm run tag:where -- --write` |
 | 문항 뽑는 규칙 바꾸기 | `src/engine/select.ts` |
 | 그림 넣기 | `public/art/` 에 같은 이름으로 덮어쓰기 |
 | 색·글꼴 바꾸기 | `src/styles/app.css` 맨 위 토큰 |
 | 채점 방식 | `src/engine/score.ts` — **가급적 건드리지 말 것** ([이유](docs/ARCHITECTURE.md)) |
+
+## 문항이 장면에 배치되는 방식
+
+장면마다 두 가지를 선언하고, **둘 다 맞는 문항만** 그 장면에 나온다.
+
+| | 뜻 | 예 |
+| --- | --- | --- |
+| `accepts` | 어느 자리의 문항을 받을지 (시간·장소) | 급식실 → `['meal', 'any']` |
+| `stages` | 어느 관계 단계를 다룰지 (문항의 `ch`) | 급식실 → `[4]` (썸) |
+
+문항 쪽에는 `where` 가 붙어 있다. 대부분(321/364)은 `any` 라서 아무 장면에나 갈 수 있고,
+구체적인 상황을 그리는 43개만 자리를 갖는다 (`meal`, `class`, `road`, `room`, `hall`, `phone`).
+
+> **장면에 이상한 문항이 나오면** 문항을 고치기 전에 `scenes.ts` 의 `accepts`/`stages` 부터 본다.
+> 대개 그쪽이 원인이고, 한 줄로 고쳐진다.
 
 ## 문서
 
