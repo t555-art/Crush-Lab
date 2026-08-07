@@ -4,13 +4,19 @@ git에 푸시하면 자동으로 빌드·배포된다. **전부 무료고 카드
 
 ## 지금 붙어 있는 방식
 
-Cloudflare가 Pages와 Workers를 통합하면서 두 종류가 생겼는데,
-이 프로젝트는 **Workers + 정적 에셋** 쪽으로 붙어 있다.
+**Pages 프로젝트**다. 서버에서 도는 코드는 없고,
+`npm run build` 가 만든 `dist/` 를 그대로 올린다.
 
-구별법: 배포 로그에 `wrangler deploy` 가 찍히면 Worker다.
-주소도 `*.workers.dev` 로 나온다. (Pages였다면 `*.pages.dev`)
+Cloudflare가 Pages와 Workers를 통합하면서 생성 경로에 따라
+배포 명령이 Workers용(`wrangler deploy`)으로 잡히는 경우가 있다.
+그러면 아래 경고와 함께 실패한다.
 
-서버에서 도는 코드는 없다. `npm run build` 가 만든 `dist/` 를 그대로 올릴 뿐이다.
+```
+It seems that you have run `wrangler deploy` on a Pages project,
+`wrangler pages deploy` should be used instead.
+```
+
+Pages 프로젝트에는 반드시 `wrangler pages deploy` 를 써야 한다.
 
 ## 설정
 
@@ -18,28 +24,36 @@ Cloudflare가 Pages와 Workers를 통합하면서 두 종류가 생겼는데,
 
 | 파일 | 역할 |
 | --- | --- |
-| `wrangler.toml` | 올릴 폴더가 `dist/` 라는 것 |
+| `wrangler.toml` | `pages_build_output_dir = "dist"` |
 | `.node-version` | 빌더가 Node 22를 쓰도록 (Astro 요구사항) |
 
-### 대시보드에서 넣어야 하는 것
-
-**빌드 명령 하나뿐이다.**
-
-```
-Build command:  npm run build
-```
-
-위치:
+### 대시보드에서 맞춰야 하는 것
 
 ```
 Workers & Pages → crush-lab → Settings → Build → Edit
 ```
 
-빌드 명령이 비어 있으면 `dist/` 가 안 만들어지고, 배포 단계에서
-`Missing entry-point to Worker script or to assets directory` 가 뜬다.
+| 항목 | 값 |
+| --- | --- |
+| Build command | `npm run build` |
+| Deploy command | `npx wrangler pages deploy dist --project-name=crush-lab` |
+
+배포 명령에 **`pages` 가 빠져 있으면** Workers 배포로 동작해서 실패한다.
+이게 가장 흔한 함정이다.
 
 **고친 뒤에는 재배포해야 반영된다.**
 `Deployments` 탭 → 최신 배포 → `Retry deployment`
+
+### 그래도 안 되면: 프로젝트를 새로 만든다
+
+설정이 꼬였을 때는 고치는 것보다 다시 만드는 게 빠르다. 데이터가 없어서 잃을 게 없다.
+
+1. `Settings → 맨 아래 Delete project`
+2. `Workers & Pages → Create → Pages 탭 → Connect to Git`
+   — **반드시 Pages 탭에서** 시작할 것. "Import a repository" 로 들어가면
+   Workers 쪽으로 만들어져서 같은 문제가 반복된다.
+3. 빌드 설정은 `npm run build` / `dist` 만 넣으면 된다.
+   이 경로로 만들면 배포 명령은 Cloudflare가 알아서 처리한다.
 
 ## 빌드가 실패하면
 
