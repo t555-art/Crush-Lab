@@ -1,0 +1,43 @@
+---
+import Base from '../layouts/Base.astro';
+import { SCENES, QUESTION_COUNT } from '../data/scenes';
+import typesJson from '../data/types.json';
+import type { CrystalType } from '../engine/types';
+
+const TYPES = typesJson as Record<string, CrystalType>;
+const codes = Object.keys(TYPES);
+---
+<Base title="Crush Lab — 하루로 보는 연애 성향">
+  <div class="doc">
+    <h1>좋아하는 사람이 있는<br />하루를 따라가 볼래?</h1>
+    <p class="lead">
+      아침에 눈 뜨는 순간부터 밤에 폰을 놓는 순간까지.
+      그 하루 동안 네가 어떻게 움직이는지 보고 네 연애 성향을 알려줄게.
+    </p>
+
+    <a class="cta" href="/play">시작하기</a>
+
+    <p>{SCENES.length}개 장면 · 질문 {QUESTION_COUNT}개 · 약 4분</p>
+
+    <h2>하루의 흐름</h2>
+    <div class="grid">
+      {SCENES.map(s => (
+        <div class="tile">
+          <b>{s.time}</b>
+          <span>{s.place} · {s.title}</span>
+        </div>
+      ))}
+    </div>
+
+    <h2>16개의 크리스탈</h2>
+    <p>검사가 끝나면 이 중 하나가 나와.</p>
+    <div class="grid">
+      {codes.map(code => (
+        <a class="tile" href={`/type/${code}`}>
+          <b>{TYPES[code].name}</b>
+          <span>{TYPES[code].gem} · {code}</span>
+        </a>
+      ))}
+    </div>
+  </div>
+</Base>

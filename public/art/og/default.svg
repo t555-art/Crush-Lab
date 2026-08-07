@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#FBFAF9"/>
+  <rect x="40" y="40" width="1120" height="550" fill="none" stroke="#DDD8E2" stroke-width="2"/>
+  <text x="600" y="248" text-anchor="middle" fill="#8B8592"
+        font-family="sans-serif" font-size="30" letter-spacing="4">연애 성향 검사</text>
+  <text x="600" y="346" text-anchor="middle" fill="#17151B"
+        font-family="sans-serif" font-size="84" font-weight="700">Crush Lab</text>
+  <text x="600" y="404" text-anchor="middle" fill="#56515E"
+        font-family="sans-serif" font-size="32">하루를 따라가며 알아보는 내 연애 성향</text>
+  <text x="600" y="560" text-anchor="middle" fill="#A9A3B2"
+        font-family="sans-serif" font-size="26" letter-spacing="3">CRUSH LAB</text>
+</svg>

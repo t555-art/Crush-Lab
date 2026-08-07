@@ -1,0 +1,17 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Crush Lab — 검사 중" fixed={true}>
+  <div id="player" class="stage"></div>
+</Base>
+
+<script>
+  import { mountPlayer } from '../scripts/player';
+  const el = document.getElementById('player');
+  if (el) mountPlayer(el);
+</script>
+
+<style is:global>
+  /* 장면 화면에서는 페이지 자체가 스크롤되면 안 된다 */
+  .app[data-fixed] { height: 100dvh; overflow: hidden; }
+</style>

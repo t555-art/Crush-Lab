@@ -1,0 +1,16 @@
+# Cloudflare Pages 응답 헤더
+# https://developers.cloudflare.com/pages/configuration/headers/
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=(), interest-cohort=()
+  X-Frame-Options: SAMEORIGIN
+
+# Astro가 파일명에 해시를 붙이므로 영구 캐시해도 안전하다
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# 그림은 교체될 수 있으니 하루만
+/art/*
+  Cache-Control: public, max-age=86400
