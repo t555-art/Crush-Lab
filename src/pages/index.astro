@@ -33,5 +33,17 @@ const ready = AXES.length > 0 && QUESTIONS.length > 0 && INTRO.length > 0;
         <a class="cta" href="/play">화면 확인하기</a>
       </>
     )}
+
+    <p class="note foot">
+      <a href="/privacy">개인정보 처리방침</a> · <a href="/terms">이용약관</a>
+    </p>
   </div>
 </Base>
+
+<style is:global>
+  .foot { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 13px; }
+  .foot a { color: var(--ink-2); }
+  .legal h2 { margin-top: 26px; }
+  .legal ul { margin: 0; padding-left: 19px; display: flex; flex-direction: column; gap: 6px;
+              font-size: 15.5px; color: var(--ink-2); }
+</style>

@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+# 부품 확인용 개발 화면 — 검색에 걸릴 이유가 없다
+Disallow: /art
+
+Sitemap: https://crush-lab.kangchiteacher123.workers.dev/sitemap-index.xml
