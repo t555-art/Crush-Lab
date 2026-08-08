@@ -281,6 +281,60 @@ body {
 .box--ask .choice:hover { background: rgba(255, 255, 255, 0.16); }
 .box--ask .choice:focus-visible { outline-color: #fff; }
 
+/* ── 슬라이더 문항 ───────────────────────────────────── */
+.scale { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+
+.scale__input {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--on-scrim);
+  background: transparent;
+}
+.scale__input:focus-visible { outline: 2px solid var(--on-scrim); outline-offset: 4px; }
+
+.scale__ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  color: var(--on-scrim-2);
+}
+
+.scale__ticks { display: flex; justify-content: space-between; padding: 0 2px; }
+.scale__tick {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--scrim-line);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.scale__tick.on { background: var(--on-scrim); transform: scale(1.5); }
+
+/* 문서형 화면(시작 질문 등)에서 쓰일 때 */
+.stage--form .scale__input { accent-color: var(--ink); }
+.stage--form .scale__ends { color: var(--ink-3); }
+.stage--form .scale__tick { background: var(--line-2); }
+.stage--form .scale__tick.on { background: var(--ink); }
+
+/* ── 아바타 ──────────────────────────────────────────────
+   답할수록 조각이 하나씩 켜지면서 구체화된다.
+   조각들은 같은 캔버스 기준으로 그려져야 겹쳤을 때 안 어긋난다. */
+.avatar {
+  position: relative;
+  width: 148px;
+  aspect-ratio: 3 / 4;
+  margin: 0 auto;
+}
+.avatar__l {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: layerIn 0.32s ease both;
+}
+@keyframes layerIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
 /* ── 축 게이지 (임시 결과 확인용) ─────────────────────── */
 .gauges { display: flex; flex-direction: column; gap: 10px; }
 .gauge { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink-2); }

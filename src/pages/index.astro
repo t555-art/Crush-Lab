@@ -1,43 +1,37 @@
 ---
 import Base from '../layouts/Base.astro';
-import { SCENES, QUESTION_COUNT } from '../data/scenes';
-import typesJson from '../data/types.json';
-import type { CrystalType } from '../engine/types';
+import { QUESTIONS } from '../data/questions';
+import { INTRO } from '../data/intro';
+import { SCENES } from '../data/scenes';
+import { AXES } from '../data/axes';
 
-const TYPES = typesJson as Record<string, CrystalType>;
-const codes = Object.keys(TYPES);
+const ready = AXES.length > 0 && QUESTIONS.length > 0 && INTRO.length > 0;
 ---
-<Base title="Crush Lab — 하루로 보는 연애 성향">
+<Base title="Crush Lab">
   <div class="doc">
-    <h1>좋아하는 사람이 있는<br />하루를 따라가 볼래?</h1>
-    <p class="lead">
-      아침에 눈 뜨는 순간부터 밤에 폰을 놓는 순간까지.
-      그 하루 동안 네가 어떻게 움직이는지 보고 네 연애 성향을 알려줄게.
-    </p>
+    <h1>Crush Lab</h1>
 
-    <a class="cta" href="/play">시작하기</a>
-
-    <p>{SCENES.length}개 장면 · 질문 {QUESTION_COUNT}개 · 약 4분</p>
-
-    <h2>하루의 흐름</h2>
-    <div class="grid">
-      {SCENES.map(s => (
-        <div class="tile">
-          <b>{s.time}</b>
-          <span>{s.place} · {s.title}</span>
+    {ready ? (
+      <>
+        <p class="lead">좋아하는 마음이 어떻게 움직이는지 알아보는 검사.</p>
+        <a class="cta" href="/play">시작하기</a>
+        <p>시작 질문 {INTRO.length}개 · 문항 {QUESTIONS.length}개</p>
+      </>
+    ) : (
+      <>
+        <p class="lead">지금은 뼈대만 있는 상태야. 검사 내용을 만드는 중.</p>
+        <div class="grid">
+          <div class="tile"><b>{AXES.length}</b><span>축</span></div>
+          <div class="tile"><b>{INTRO.length}</b><span>시작 질문</span></div>
+          <div class="tile"><b>{QUESTIONS.length}</b><span>문항</span></div>
+          <div class="tile"><b>{SCENES.length}</b><span>장면</span></div>
         </div>
-      ))}
-    </div>
-
-    <h2>16개의 크리스탈</h2>
-    <p>검사가 끝나면 이 중 하나가 나와.</p>
-    <div class="grid">
-      {codes.map(code => (
-        <a class="tile" href={`/type/${code}`}>
-          <b>{TYPES[code].name}</b>
-          <span>{TYPES[code].gem} · {code}</span>
-        </a>
-      ))}
-    </div>
+        <p class="note">
+          화면·채점·배포는 다 돌아간다. 들어갈 내용만 없다.
+          채우는 방법은 <code>docs/HANDOFF.md</code> 에 있다.
+        </p>
+        <a class="cta" href="/play">화면 확인하기</a>
+      </>
+    )}
   </div>
 </Base>

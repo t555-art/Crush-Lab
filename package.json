@@ -11,8 +11,7 @@
     "build": "astro build",
     "preview": "astro preview --host",
     "check": "astro check",
-    "check:questions": "node tools/check-coverage.mjs",
-    "art": "node tools/make-art-placeholders.mjs"
+    "check:questions": "node tools/check-coverage.mjs"
   },
   "dependencies": {
     "astro": "^5.14.1"
