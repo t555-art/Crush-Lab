@@ -281,37 +281,110 @@ body {
 .box--ask .choice:hover { background: rgba(255, 255, 255, 0.16); }
 .box--ask .choice:focus-visible { outline-color: #fff; }
 
-/* ── 슬라이더 문항 ───────────────────────────────────── */
-.scale { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+/* ── 슬라이더 문항 ─────────────────────────────────────
+   손가락으로 쓰는 물건이라 크게 잡았다.
+   · 트랙 전체 높이 48px — 터치 목표 권장치(44px) 이상
+   · 트랙 아무 데나 눌러도 그 자리로 점프한다 (끌기 / 탭 둘 다 됨)
+   · 눈금은 트랙 뒤에 깔아서 따로 놀지 않게 한다
+   기본 range 모양은 브라우저마다 제각각이라 전부 직접 그린다. */
 
-.scale__input {
-  width: 100%;
-  margin: 0;
-  accent-color: var(--on-scrim);
-  background: transparent;
-}
-.scale__input:focus-visible { outline: 2px solid var(--on-scrim); outline-offset: 4px; }
+.scale { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
 
 .scale__ends {
   display: flex;
   justify-content: space-between;
   font-size: 12.5px;
   color: var(--on-scrim-2);
+  padding: 0 2px;
 }
 
-.scale__ticks { display: flex; justify-content: space-between; padding: 0 2px; }
+.scale__track {
+  position: relative;
+  height: 48px;
+  display: flex;
+  align-items: center;
+}
+
+/* 눈금 — 트랙 뒤에 깔린다 */
+.scale__ticks {
+  position: absolute;
+  inset: 0 13px;                 /* 손잡이 반지름만큼 안쪽으로 */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+}
 .scale__tick {
-  width: 5px; height: 5px; border-radius: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
   background: var(--scrim-line);
   transition: background 0.15s ease, transform 0.15s ease;
 }
-.scale__tick.on { background: var(--on-scrim); transform: scale(1.5); }
+.scale__tick.on { background: var(--on-scrim); transform: scale(2.2); }
+
+.scale__input {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  width: 100%;
+  height: 48px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* 트랙 */
+.scale__input::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--scrim-line);
+}
+.scale__input::-moz-range-track {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--scrim-line);
+}
+
+/* 손잡이 — 26px. 작으면 손가락으로 못 잡는다 */
+.scale__input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 26px;
+  height: 26px;
+  margin-top: -11px;             /* (트랙 4px - 손잡이 26px) / 2 */
+  border-radius: 50%;
+  background: var(--on-scrim);
+  border: 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  transition: transform 0.12s ease;
+}
+.scale__input::-moz-range-thumb {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--on-scrim);
+  border: 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+.scale__input:active::-webkit-slider-thumb { transform: scale(1.15); }
+
+.scale__input:focus { outline: none; }
+.scale__input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px var(--on-scrim), 0 2px 10px rgba(0, 0, 0, 0.45);
+}
 
 /* 문서형 화면(시작 질문 등)에서 쓰일 때 */
-.stage--form .scale__input { accent-color: var(--ink); }
 .stage--form .scale__ends { color: var(--ink-3); }
 .stage--form .scale__tick { background: var(--line-2); }
 .stage--form .scale__tick.on { background: var(--ink); }
+.stage--form .scale__input::-webkit-slider-runnable-track { background: var(--line); }
+.stage--form .scale__input::-moz-range-track { background: var(--line); }
+.stage--form .scale__input::-webkit-slider-thumb {
+  background: var(--ink);
+  box-shadow: 0 2px 8px rgba(23, 21, 27, 0.28);
+}
+.stage--form .scale__input::-moz-range-thumb { background: var(--ink); }
 
 /* ── 아바타 ──────────────────────────────────────────────
    답할수록 조각이 하나씩 켜지면서 구체화된다.
