@@ -1,5 +1,5 @@
 import type {
-  AxisId, Question, QuestionPick, ResolvedScene, Scene, Traits,
+  AxisId, Question, QuestionPick, ResolvedBeat, ResolvedScene, Scene, Traits,
 } from './types';
 import { QUESTIONS } from '../data/questions';
 import { AXES } from '../data/axes';
@@ -135,6 +135,84 @@ export function pickForPerson(traits: Traits, limit: number, rnd: () => number):
 }
 
 /**
+ * 장면들이 요구하는 문항 자리 수 — slot 별로.
+ * 예산을 쓰기 **전에** 이걸 먼저 알아야 한다.
+ */
+function demandOf(scenes: Scene[]): Map<string, number> {
+  const d = new Map<string, number>();
+  for (const s of scenes) {
+    const n = Math.min(
+      s.beats.filter(b => b.kind === 'question').length,
+      SURVEY.maxPerScene
+    );
+    const slot = s.slot ?? '';
+    d.set(slot, (d.get(slot) ?? 0) + n);
+  }
+  return d;
+}
+
+/**
+ * 장면 구성을 보고 문항을 고른다.
+ *
+ * ★ pickForPerson 과 뭐가 다른가 — 이게 이 파일에서 제일 중요한 차이다.
+ *
+ * pickForPerson 은 `show` 와 `aspect` 만 보고 예산만큼 뽑는다. **slot 을 모른다.**
+ * 그래서 뽑고 난 뒤에 장면이 slot 으로 거르면, 그 slot 문항이 모자란 경우가 생긴다.
+ * 그러면 그 장면의 문항 자리가 조용히 사라지고(`if (!found) return []`),
+ * **그 사람만 검사가 짧아진다.** 문항이 400개고 slot 이 9개면 실제로 일어난다.
+ *
+ * 그래서 순서를 뒤집는다 — 장면별 수요를 먼저 세고, slot 마다 그만큼 확보한다.
+ * 역할(aspect) 균형은 slot 을 가로질러 맞춘다. 한 slot 안에서 균형을 맞추려 하면
+ * slot 당 문항이 7개뿐이라 어차피 안 된다.
+ */
+export function pickForScenes(
+  scenes: Scene[],
+  traits: Traits,
+  rnd: () => number
+): Question[] {
+  const avail = QUESTIONS.filter(q => canAsk(q, traits));
+  const budget = Math.min(SURVEY.storyTarget, SURVEY.maxTotal);
+  const taken = new Set<string>();
+  const perAspect = new Map<string, number>();
+  const out: Question[] = [];
+
+  const aspects = new Set<string>();
+  for (const q of avail) for (const a of aspectsOf(q)) aspects.add(a);
+
+  /** slot 이 없는 문항은 아무 데나 쓸 수 있다 */
+  const fitsSlot = (q: Question, slot: string) =>
+    !slot || !q.slots?.length || q.slots.includes(slot);
+
+  const add = (q: Question) => {
+    taken.add(q.id);
+    out.push(q);
+    for (const a of aspectsOf(q)) perAspect.set(a, (perAspect.get(a) ?? 0) + 1);
+  };
+
+  for (const [slot, want] of demandOf(scenes)) {
+    const cands = shuffle(avail.filter(q => fitsSlot(q, slot)), rnd);
+    let got = 0;
+    while (got < want && out.length < budget) {
+      // 아직 최소치를 못 채운 역할부터, 그중에서도 제일 적은 것
+      const lacking = [...aspects]
+        .filter(a => (perAspect.get(a) ?? 0) < SURVEY.minPerAspect)
+        .sort((x, y) => (perAspect.get(x) ?? 0) - (perAspect.get(y) ?? 0));
+
+      let pick: Question | undefined;
+      for (const a of lacking) {
+        pick = cands.find(q => !taken.has(q.id) && aspectsOf(q).includes(a));
+        if (pick) break;
+      }
+      pick ??= cands.find(q => !taken.has(q.id));
+      if (!pick) break;   // 이 slot 에 낼 문항이 동났다 — 문항을 더 써야 한다는 뜻
+      add(pick);
+      got++;
+    }
+  }
+  return out;
+}
+
+/**
  * 장면의 문항 자리를 실제 문항으로 채운다.
  * 장면이 하나도 없으면 문항만 순서대로 낸다 — 서사 없이도 검사는 돌아간다.
  */
@@ -144,12 +222,14 @@ export function resolve(
   seed = seedFrom(traits)
 ): ResolvedScene[] {
   const rnd = mulberry32(seed);
-  const budget = Math.min(SURVEY.storyTarget, SURVEY.maxTotal);
-  const pool = pickForPerson(traits, budget, rnd);
+  // 이 사람에게 보여줄 장면들. 조건(when)이 안 맞는 장면은 통째로 빠진다
+  const usable = scenes.filter(s => matches(s.when, traits));
+  const pool = usable.length
+    ? pickForScenes(usable, traits, rnd)
+    : pickForPerson(traits, Math.min(SURVEY.storyTarget, SURVEY.maxTotal), rnd);
   const used = new Set<string>();
 
   // 서사가 없으면 문항만 담은 장면 하나
-  const usable = scenes.filter(s => matches(s.when, traits));
   if (!usable.length) {
     return pool.length
       ? [{
@@ -167,7 +247,9 @@ export function resolve(
       label: scene.label,
       background: scene.background,
       cast: composeCast(scene.cast, traits),
-      beats: scene.beats.flatMap(beat => {
+      // 반환 타입을 명시해야 한다 — 지문 갈래와 문항 갈래가 서로 다른 모양이라
+      // 추론에 맡기면 유니온이 안 잡힌다 (원래 있던 타입 오류였다)
+      beats: scene.beats.flatMap((beat): ResolvedBeat[] => {
         if (beat.kind !== 'question') {
           return [{
             kind: beat.kind,

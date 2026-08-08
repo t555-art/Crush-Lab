@@ -34,6 +34,7 @@ export const AXES: Axis[] = [
     name: '신호 민감도',
     posLabel: '예민',
     negLabel: '태연',
+    posCode: 'A', negCode: 'C',
     desc: '상대의 반응 하나에 얼마나 흔들리는가. 읽씹·답장 속도·의미부여',
   },
   {
@@ -41,6 +42,7 @@ export const AXES: Axis[] = [
     name: '거리 조절',
     posLabel: '방어',
     negLabel: '개방',
+    posCode: 'D', negCode: 'O',
     desc: '가까워지는 것 자체가 편한가 부담스러운가. 속마음을 꺼내는가 접어두는가',
   },
   {
@@ -48,6 +50,7 @@ export const AXES: Axis[] = [
     name: '행동',
     posLabel: '직진',
     negLabel: '관망',
+    posCode: 'F', negCode: 'W',
     desc: '먼저 말을 걸고 약속을 잡는가, 신호를 기다리는가',
   },
   {
@@ -55,6 +58,7 @@ export const AXES: Axis[] = [
     name: '속도',
     posLabel: '금사빠',
     negLabel: '늦사빠',
+    posCode: 'Q', negCode: 'S',
     desc: '확신이 서는 데 걸리는 시간. 감정이 먼저인가 검증이 먼저인가',
   },
 ];
