@@ -209,7 +209,7 @@ body {
   z-index: 1;
 }
 
-.figure { position: relative; width: 150px; aspect-ratio: 3 / 5; }
+.figure { position: relative; width: 150px; aspect-ratio: 2 / 3; }
 .figure__p {
   position: absolute;
   inset: 0;
@@ -220,7 +220,7 @@ body {
 
 /* 시작 질문 화면의 내 아바타 */
 .mecanvas { display: flex; justify-content: center; min-height: 176px; }
-.figure--me { width: 132px; aspect-ratio: 3 / 4; }
+.figure--me { width: 132px; aspect-ratio: 2 / 3; }
 .figure--me .figure__p { animation: partIn 0.32s ease both; }
 @keyframes partIn {
   from { opacity: 0; transform: translateY(5px); }

@@ -1,0 +1,161 @@
+---
+import Base from '../layouts/Base.astro';
+import { PARTS } from '../data/parts';
+import { CANVAS, ANCHORS } from '../data/art-spec';
+import type { PartOption } from '../engine/types';
+
+/**
+ * 부품 확인용 화면.
+ *
+ * 이미지를 넣자마자 여기서 겹쳐 보고 어긋나는지 확인한다.
+ * 50장 뽑고 나서 안 맞는 걸 알면 늦다.
+ *
+ * 개발용이라 검색엔진에는 안 걸리게 해뒀다.
+ */
+const bySlot = new Map<string, PartOption[]>();
+for (const p of PARTS) {
+  if (!bySlot.has(p.slot)) bySlot.set(p.slot, []);
+  bySlot.get(p.slot)!.push(p);
+}
+const slots = [...bySlot.keys()];
+
+/** 각 슬롯에서 하나씩 골라 만든 조합 (최대 12개까지만 보여준다) */
+function combos(limit = 12) {
+  let out: PartOption[][] = [[]];
+  for (const slot of slots) {
+    const opts = bySlot.get(slot)!;
+    out = out.flatMap(base => opts.map(o => [...base, o]));
+    if (out.length > limit) { out = out.slice(0, limit); break; }
+  }
+  return out.slice(0, limit);
+}
+const list = PARTS.length ? combos() : [];
+const anchorPct = Object.entries(ANCHORS).filter(([k]) => k !== 'center');
+---
+<Base title="부품 확인 — Crush Lab">
+  <div class="doc artlab">
+    <a class="crumb" href="/">← Crush Lab</a>
+    <h1>부품 확인</h1>
+
+    {PARTS.length === 0 ? (
+      <>
+        <p class="lead">아직 등록된 부품이 없어.</p>
+        <p class="note">
+          그림을 <code>public/art/parts/</code> 에 넣고
+          <code>src/data/parts.ts</code> 에 등록하면 여기서 바로 겹쳐 볼 수 있어.
+          규격은 <a href="/art/_guide.svg">정렬 가이드</a>를 참고.
+        </p>
+        <p class="note">규격: <b>{CANVAS.w}×{CANVAS.h}</b> (2:3) · 배경 투명 · WebP 권장</p>
+      </>
+    ) : (
+      <>
+        <p class="note">
+          부품 {PARTS.length}개 · 슬롯 {slots.length}개 ({slots.join(', ')})
+        </p>
+
+        <label class="toggle">
+          <input type="checkbox" id="guide" />
+          <span>기준선 겹쳐 보기</span>
+        </label>
+
+        <h2>조합</h2>
+        <p class="note">겹쳤을 때 목·어깨가 어긋나면 그 부품의 기준선이 안 맞는 것이다.</p>
+        <div class="combos">
+          {list.map(parts => (
+            <div class="combo">
+              <div class="combo__fig">
+                {parts.sort((a, b) => a.z - b.z).map(p => (
+                  <img src={p.src} alt={p.label ?? p.id} loading="lazy" />
+                ))}
+                <div class="combo__guide">
+                  {anchorPct.map(([k, v]) => (
+                    <span class="gl" style={`top:${(v / CANVAS.h) * 100}%`} data-k={k}></span>
+                  ))}
+                  <span class="gl gl--v"></span>
+                </div>
+              </div>
+              <p class="combo__n">{parts.map(p => p.label ?? p.id).join(' · ')}</p>
+            </div>
+          ))}
+        </div>
+
+        <h2>부품 낱개</h2>
+        {slots.map(slot => (
+          <div class="slotrow">
+            <p class="slotrow__k">{slot}</p>
+            <div class="slotrow__items">
+              {bySlot.get(slot)!.map(p => (
+                <div class="one">
+                  <div class="one__fig">
+                    <img src={p.src} alt={p.label ?? p.id} loading="lazy" />
+                    <div class="combo__guide">
+                      {anchorPct.map(([k, v]) => (
+                        <span class="gl" style={`top:${(v / CANVAS.h) * 100}%`}></span>
+                      ))}
+                      <span class="gl gl--v"></span>
+                    </div>
+                  </div>
+                  <p class="one__n">{p.label ?? p.id}</p>
+                  <p class="one__m">{p.when ? JSON.stringify(p.when) : '기본값'}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </>
+    )}
+  </div>
+</Base>
+
+<style is:global>
+  .artlab .combos {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
+  }
+  .artlab .combo__fig, .artlab .one__fig {
+    position: relative;
+    aspect-ratio: 2 / 3;
+    background:
+      repeating-conic-gradient(#EFECF2 0% 25%, #FFF 0% 50%) 50% / 16px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .artlab .combo__fig img, .artlab .one__fig img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%; object-fit: contain;
+  }
+  .artlab .combo__guide { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+  .artlab.guide-on .combo__guide { opacity: 1; }
+  .artlab .gl {
+    position: absolute; left: 0; right: 0; height: 0;
+    border-top: 1px dashed rgba(255, 45, 120, 0.8);
+  }
+  .artlab .gl--v {
+    top: 0; bottom: 0; left: 50%; right: auto; height: auto;
+    border-top: 0; border-left: 1px dashed rgba(45, 125, 255, 0.8);
+  }
+  .artlab .combo__n, .artlab .one__n {
+    margin: 5px 0 0; font-size: 11.5px; line-height: 1.4; color: var(--ink-2);
+  }
+  .artlab .one__m { margin: 2px 0 0; font-size: 10.5px; color: var(--ink-3); word-break: break-all; }
+  .artlab .slotrow { margin-top: 18px; }
+  .artlab .slotrow__k {
+    margin: 0 0 8px; font-size: 12px; letter-spacing: 0.08em; color: var(--ink-3);
+  }
+  .artlab .slotrow__items {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px;
+  }
+  .artlab .toggle {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 14px; cursor: pointer;
+  }
+</style>
+
+<script>
+  const box = document.querySelector('.artlab');
+  document.getElementById('guide')?.addEventListener('change', e => {
+    box?.classList.toggle('guide-on', (e.target as HTMLInputElement).checked);
+  });
+</script>
