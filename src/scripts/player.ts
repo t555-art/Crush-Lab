@@ -256,15 +256,18 @@ function scaleHtml(q: ScaleQuestion): string {
   const v = state.draft ?? mid;
   return `<p class="line">${text(q.text)}</p>
     <div class="scale">
-      <input class="scale__input" type="range" min="0" max="${q.steps - 1}" step="1" value="${v}"
-             aria-label="${esc(q.text)}">
       <div class="scale__ends">
         <span>${esc(q.minLabel)}</span>
         <span>${esc(q.maxLabel)}</span>
       </div>
-      <div class="scale__ticks">
-        ${Array.from({ length: q.steps }, (_, i) =>
-          `<span class="scale__tick${i === v ? ' on' : ''}"></span>`).join('')}
+      <div class="scale__track">
+        <div class="scale__ticks">
+          ${Array.from({ length: q.steps }, (_, i) =>
+            `<span class="scale__tick${i === v ? ' on' : ''}"></span>`).join('')}
+        </div>
+        <input class="scale__input" type="range" min="0" max="${q.steps - 1}" step="1" value="${v}"
+               aria-label="${esc(q.text)}"
+               aria-valuetext="${esc(q.minLabel)} ~ ${esc(q.maxLabel)} 중 ${v + 1}단계">
       </div>
     </div>
     <div class="choices"><button class="choice scale__ok">다음</button></div>`;
