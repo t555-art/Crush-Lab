@@ -2,6 +2,7 @@ import type {
   Answers, AxisId, Question, ScoreResult, Strength, Traits,
 } from './types';
 import { AXES } from '../data/axes';
+import { aspectCounts } from './select';
 
 /**
  * 채점.
@@ -74,7 +75,11 @@ export function score(
     strength[id] = strengthOf(norm[id]);
   }
 
-  return { norm, strength, answered, traits: gained };
+  // 역할별로 몇 문항이나 물었는지 — 결과 신뢰도를 보여줄 때 쓴다.
+  // 어떤 항목을 2문항만 물었으면 그 항목 점수는 믿을 게 못 된다
+  const answeredQs = questions.filter(q => answers[q.id] != null);
+
+  return { norm, strength, answered, traits: gained, perAspect: aspectCounts(answeredQs) };
 }
 
 function normalize(raw: number, exp: number, maxP: number, maxN: number): number {
