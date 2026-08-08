@@ -153,6 +153,45 @@ meet=outside   morning → commute-far  → class-alone → lunch-far  → hall-
 **반드시 짝으로 쓴다.** `show: { school: 'boys' }` 를 쓰면 같은 slot·같은 axis 로
 `girls` 와 `co` 몫도 만든다.
 
+### 조사한 것 — 단성학교 이용자를 위한 재료
+
+**학술 쪽 (일관되게 재현됨)**
+
+- 단성학교 졸업생은 이성 친구가 적고, **첫 데이트 연령이 늦고**, 사귄 사람 수가 적다.
+  단성 교육이 이성과의 연애를 **지연·감소**시킨다
+- **이성 앞 불안(mixed-gender anxiety)** 은 측정 도구가 있는 구성개념이다.
+  **DAS-A**(Dating Anxiety Scale for Adolescents) 21문항을 11문항으로 줄여 쓴다.
+  하위척도는 *부정적 평가에 대한 두려움*(3문항) · *잠재적 연애 상황에서의 사회적 고통*(4문항)
+- 단성학교 학생은 **고등학교·대학 표본 양쪽에서** 이 불안이 높고 이성 친구가 적다.
+  '성별 현저성'(성별을 더 의식함)도 높다
+- 반대편에 **이성 관계 효능감**이 있다. 높으면 이후 연애 관여가 늘고,
+  이성 앞 불안·사회불안과는 부적 상관
+
+**한국의 실제 경로 (커뮤니티 후기)**
+
+| 경로 | 내용 |
+| --- | --- |
+| 친구 소개 · 친구의 친구 | 같이 놀다가 생기는 인연. 가장 흔하다 |
+| 연합 동아리 | 여고 동아리가 타 학교와 연합 활동 |
+| 학교 축제 | 공연하면 번호를 물어보는 사람이 생긴다. 부스 블라인드 소개팅도 있다 |
+| 학원 · 과외 | 근처에 이성 학교가 없으면 사실상 여기 의존 |
+| 알바 | 편의점·카페·음식점. 알바생끼리 |
+
+> ⚠️ **"미팅"·"과팅" 은 쓰지 말 것.** 주로 대학생 문화라 고등학생 문항에 넣으면 겉돈다.
+> 같은 뜻이라도 **"친구가 소개해준다"** 로 쓴다.
+
+**반영 방법**
+
+1. **이성 앞 불안은 축이 아니라 하위 지표로.** `anxiety`·`avoid` 와 상관이 있어서
+   축으로 만들면 유형 공간이 접힌다. 선택지에 `tags: ['mga']` 를 달아 집계하고
+   결과지 서술에만 쓴다 — *"이성 앞에서 말이 안 나오는 건 성격이라기보다
+   마주칠 일이 없어서 연습량이 부족한 쪽에 가깝다"* 같은 문장이 근거를 갖고 나간다.
+   단성학교 이용자와 공학 이용자의 결과가 실제로 갈리는 지점이다
+2. **소개·축제·알바는 문항 소재로** 먼저 쓴다 (`show: { school: ['boys','girls'] }`)
+3. `meet` 선택지에 소개·축제·알바를 **값으로** 추가하는 건 보류.
+   4개 → 7개로 늘리면 조합이 19,440 → 34,020 이 되어 검사 상한을 넘는다.
+   코드 쪽에 요청한 "아바타 전용 특성 제외" 가 먼저다 (그러면 720조합이 된다)
+
 ### 분량
 
 ```
@@ -298,3 +337,7 @@ tags: ['art']
 - 사랑유형 척도의 요인구조 문제 — [LAS 성별 불변성 연구](https://www.tpmap.org/wp-content/uploads/2015/11/22.3.6.pdf)
 - 애착과 온라인 행동 — [애착 유형별 SNS 사용 (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC7281798/)
 - 한국 학생 연애 문화 — [학생들의 연애](https://brunch.co.kr/@7759ded550b84c0/3)
+- 단성학교와 이성 앞 불안 — [PLOS One (2018)](https://journals.plos.org/plosone/article?id=10.1371%2Fjournal.pone.0208707) · [고교 졸업 전후 종단 연구](https://www.sciencedirect.com/science/article/abs/pii/S0022440524001183)
+- 단성학교와 연애·데이트 — [Single-Sex Schooling: Friendships, Dating, and Sexual Orientation](https://link.springer.com/article/10.1007/s10508-018-1187-6)
+- 또래 네트워크가 데이팅의 기원 — [Friends First? (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC4847141/)
+- 한국 단성학교 학생 만남 경로 — [여고 다닐 때 연애](https://www.a-ha.io/questions/4b62db2c848aa45db9ff12d4384c6d48) · [남고인데 연애하는 법](https://academy.prompie.com/communities/posts/%EB%82%A8%EA%B3%A0%EC%9D%B8%EB%8D%B0-%EC%97%B0%EC%95%A0%ED%95%98%EB%8A%94%EB%B2%95%EC%A2%80-eukdkZBh/) · [소개팅 (나무위키)](https://namu.wiki/w/%EC%86%8C%EA%B0%9C%ED%8C%85)
