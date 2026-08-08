@@ -183,9 +183,13 @@ export function pickForScenes(
   const fitsSlot = (q: Question, slot: string) =>
     !slot || !q.slots?.length || q.slots.includes(slot);
 
-  const add = (q: Question) => {
+  /** 어느 문항을 어느 slot 자리에 넣었는지 — 짝 맞추기에서 쓴다 */
+  const slotOf = new Map<string, string>();
+
+  const add = (q: Question, slot: string) => {
     taken.add(q.id);
     out.push(q);
+    slotOf.set(q.id, slot);
     for (const a of aspectsOf(q)) perAspect.set(a, (perAspect.get(a) ?? 0) + 1);
   };
 
@@ -205,11 +209,68 @@ export function pickForScenes(
       }
       pick ??= cands.find(q => !taken.has(q.id));
       if (!pick) break;   // 이 slot 에 낼 문항이 동났다 — 문항을 더 써야 한다는 뜻
-      add(pick);
+      add(pick, slot);
       got++;
     }
   }
+
+  securePairs(out, avail, taken, slotOf, perAspect, fitsSlot);
   return out;
+}
+
+/**
+ * 짝 문항 보장.
+ *
+ * ★ 이게 없으면 모순 탐지가 사실상 안 걸린다.
+ *
+ * `pair` 로 묶인 두 문항은 **둘 다 나와야** 답이 어긋났는지 볼 수 있다.
+ * 그런데 출제는 무작위라 한쪽만 뽑히는 일이 대부분이다 —
+ * 문항 380개 중 63개를 뽑으면 짝이 같이 나올 확률이 3% 남짓이다.
+ * 그러면 결과지의 "솔직히 말하면" 이 거의 항상 비어버린다.
+ *
+ * 그래서 한쪽이 뽑혔으면 나머지 한쪽을 **같은 slot 안에서 자리를 바꿔** 끼운다.
+ * 짝은 같은 축을 재도록 쓰기로 했으므로(docs/DESIGN.md), 같은 축 문항을 빼고
+ * 넣으면 역할 균형이 그대로 유지된다.
+ */
+function securePairs(
+  out: Question[],
+  avail: Question[],
+  taken: Set<string>,
+  slotOf: Map<string, string>,
+  perAspect: Map<string, number>,
+  fitsSlot: (q: Question, slot: string) => boolean,
+): void {
+  for (const q of [...out]) {
+    if (!q.pair) continue;
+    // 이미 짝이 들어와 있으면 할 일 없다
+    if (out.some(x => x !== q && x.pair === q.pair)) continue;
+
+    const partner = avail.find(x => x.pair === q.pair && x.id !== q.id && !taken.has(x.id));
+    if (!partner) continue;
+
+    // 짝이 들어갈 자리를 정한다. 자기 slot 이 있으면 거기, 없으면 원본 옆자리
+    const slots = out
+      .map(x => slotOf.get(x.id)!)
+      .filter(s => fitsSlot(partner, s));
+    const target = slots.find(s => partner.slots?.includes(s)) ?? slots[0];
+    if (!target) continue;
+
+    // 그 자리에서 뺄 것 — 짝이 없고, 같은 축이면 균형이 안 흔들린다
+    const pAspect = aspectsOf(partner)[0];
+    const inTarget = out.filter(x => slotOf.get(x.id) === target && !x.pair);
+    const victim =
+      inTarget.find(x => aspectsOf(x)[0] === pAspect) ?? inTarget[inTarget.length - 1];
+    if (!victim) continue;
+
+    // 교체
+    out[out.indexOf(victim)] = partner;
+    taken.delete(victim.id);
+    taken.add(partner.id);
+    slotOf.delete(victim.id);
+    slotOf.set(partner.id, target);
+    for (const a of aspectsOf(victim)) perAspect.set(a, (perAspect.get(a) ?? 1) - 1);
+    for (const a of aspectsOf(partner)) perAspect.set(a, (perAspect.get(a) ?? 0) + 1);
+  }
 }
 
 /**
