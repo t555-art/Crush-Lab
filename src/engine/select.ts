@@ -1,58 +1,53 @@
 import type {
-  Answers, BankId, IntroAnswers, Question, ResolvedScene, Scene,
+  Condition, Question, ResolvedScene, Scene, Traits,
 } from './types';
-
-import ch1 from '../data/questions/ch1-me.json';
-import ch2 from '../data/questions/ch2-pull.json';
-import ch3 from '../data/questions/ch3-crush.json';
-import ch4 from '../data/questions/ch4-some.json';
-import ch5 from '../data/questions/ch5-ask.json';
-import ch6 from '../data/questions/ch6-dating.json';
-import ch7 from '../data/questions/ch7-after.json';
-import extra from '../data/questions/pool-extra.json';
+import { QUESTIONS } from '../data/questions';
 
 /**
- * 문항 선택.
+ * 문항 고르기.
  *
- * ★ 문항 뽑는 규칙을 바꾸고 싶으면 이 파일만 고치면 된다.
- *   장면(data/scenes.ts)도 채점(score.ts)도 안 건드려도 된다.
+ * ★ 뽑는 규칙을 바꾸고 싶으면 이 파일만 고치면 된다.
+ *   문항(data/questions.ts)도 장면(data/scenes.ts)도 채점(score.ts)도 안 건드려도 된다.
  *
- * 지금 규칙은 일부러 단순하게 뒀다 —
- *   1. 자기소개 조건(need)에 맞는 문항만 남긴다
- *   2. 조건이 붙은 문항을 먼저 쓴다 (개인화가 눈에 보이게)
- *   3. 나머지는 시드 기반 무작위
- * v1의 챕터 할당량·미러쌍 강제 같은 건 아직 안 옮겼다.
- * 문항 내용이 확정되면 그때 필요한 규칙만 골라서 되살리는 게 낫다.
+ * 지금 규칙은 일부러 최소한이다 — 조건에 맞는 것 중에서 순서대로 뽑는다.
+ * 문항이 확정되면 그때 필요한 규칙(축 균형, 난이도 배분, 중복 주제 회피 등)을
+ * 여기에 얹으면 된다.
  */
 
-export const BANKS: Record<BankId, Question[]> = {
-  'ch1-me': ch1 as Question[],
-  'ch2-pull': ch2 as Question[],
-  'ch3-crush': ch3 as Question[],
-  'ch4-some': ch4 as Question[],
-  'ch5-ask': ch5 as Question[],
-  'ch6-dating': ch6 as Question[],
-  'ch7-after': ch7 as Question[],
-  'pool-extra': extra as Question[],
-};
+export { QUESTIONS };
 
-export const ALL_QUESTIONS: Question[] = Object.values(BANKS).flat();
-
-/** 자기소개 답변으로 이 문항을 낼 수 있는지 */
-export function matches(q: Question, intro: IntroAnswers): boolean {
-  const n = q.need;
-  if (!n) return true;
-  if (n.g && n.g !== intro.gender) return false;
-  if (n.grade && !n.grade.includes(intro.grade)) return false;
-  if (n.school && n.school !== intro.school) return false;
-  if (n.exp && !n.exp.includes(intro.exp)) return false;
-  if (n.status && !n.status.includes(intro.status)) return false;
-  if (n.social && !n.social.includes(intro.social)) return false;
+/** 조건이 특성과 맞는지 */
+export function matches(cond: Condition | undefined, traits: Traits): boolean {
+  if (!cond) return true;
+  for (const [key, want] of Object.entries(cond)) {
+    // tags 는 문항의 태그 배열을 보는 특수 키
+    if (key === 'tags') continue;
+    const have = traits[key];
+    if (have === undefined) return false;
+    if (Array.isArray(want) ? !want.includes(have) : want !== have) return false;
+  }
   return true;
 }
 
-/* 같은 자기소개 + 같은 시드면 같은 문항이 나오게 한다.
-   결과를 다시 열거나 공유할 때 흔들리지 않아야 하므로 난수는 시드 고정. */
+/** 문항이 이 응답자에게 나갈 수 있는지 */
+export function canAsk(q: Question, traits: Traits): boolean {
+  return matches(q.show, traits);
+}
+
+/** pick 조건에 맞는 문항인지 (tags 는 문항 태그를 본다) */
+function fitsPick(q: Question, pick: Condition | undefined, traits: Traits): boolean {
+  if (!canAsk(q, traits)) return false;
+  if (!pick) return true;
+  const wantTags = pick.tags;
+  if (wantTags) {
+    const list = Array.isArray(wantTags) ? wantTags : [wantTags];
+    if (!list.some(t => q.tags?.includes(t))) return false;
+  }
+  return true;
+}
+
+/* 같은 사람에게는 같은 문항이 나오게 시드를 고정한다.
+   결과를 다시 열거나 공유할 때 흔들리면 안 된다. */
 function mulberry32(seed: number) {
   let a = seed >>> 0;
   return () => {
@@ -72,8 +67,8 @@ function shuffle<T>(arr: T[], rnd: () => number): T[] {
   return out;
 }
 
-export function seedFrom(intro: IntroAnswers): number {
-  const s = Object.keys(intro).sort().map(k => `${k}:${intro[k]}`).join('|');
+export function seedFrom(traits: Traits): number {
+  const s = Object.keys(traits).sort().map(k => `${k}:${traits[k]}`).join('|');
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);
@@ -83,83 +78,69 @@ export function seedFrom(intro: IntroAnswers): number {
 }
 
 /**
- * 장면들의 문항 자리를 실제 문항으로 채운다.
- * 같은 문항이 두 번 나오지 않게 전역으로 중복을 막는다.
+ * 장면의 문항 자리를 실제 문항으로 채운다.
+ *
+ * 장면이 하나도 없으면 조건에 맞는 문항을 순서대로 낸다.
+ * 즉 서사가 없어도 검사는 돌아간다.
  */
-export function resolveScenes(
+export function resolve(
   scenes: Scene[],
-  intro: IntroAnswers,
-  seed = seedFrom(intro)
+  traits: Traits,
+  seed = seedFrom(traits)
 ): ResolvedScene[] {
   const rnd = mulberry32(seed);
   const used = new Set<string>();
+  const pool = shuffle(QUESTIONS.filter(q => canAsk(q, traits)), rnd);
 
-  /** 뱅크별로 미리 섞어두고 앞에서부터 꺼내 쓴다 */
-  const queues = new Map<BankId, Question[]>();
-  const queueFor = (bank: BankId): Question[] => {
-    let q = queues.get(bank);
-    if (!q) {
-      const avail = (BANKS[bank] ?? []).filter(x => matches(x, intro));
-      // 조건부 문항을 앞에 둬서 개인화가 실제로 드러나게 한다
-      const targeted = shuffle(avail.filter(x => x.need), rnd);
-      const general = shuffle(avail.filter(x => !x.need), rnd);
-      q = [...targeted, ...general];
-      queues.set(bank, q);
-    }
-    return q;
-  };
+  // 서사가 없으면 문항만 담은 장면 하나로 만든다
+  if (!scenes.length) {
+    return pool.length
+      ? [{
+          id: 'all', title: '',
+          beats: pool.map(q => ({ kind: 'question' as const, question: q })),
+        }]
+      : [];
+  }
 
-  const take = (bank: BankId): Question | null => {
-    const q = queueFor(bank);
-    while (q.length) {
-      const next = q.shift()!;
-      if (!used.has(next.id)) {
-        used.add(next.id);
-        return next;
-      }
-    }
-    // 뱅크가 말랐으면 여분 풀에서 메운다
-    if (bank !== 'pool-extra') return take('pool-extra');
+  const take = (pick?: Condition): Question | null => {
+    const found = pool.find(q => !used.has(q.id) && fitsPick(q, pick, traits));
+    if (found) { used.add(found.id); return found; }
     return null;
   };
 
   return scenes.map(scene => ({
     id: scene.id,
-    time: scene.time,
-    place: scene.place,
     title: scene.title,
+    label: scene.label,
     art: scene.art,
     beats: scene.beats.flatMap(beat => {
       if (beat.kind !== 'question') {
-        return [{ kind: beat.kind, text: (beat as any).text, speaker: (beat as any).speaker }];
+        return [{
+          kind: beat.kind,
+          text: (beat as { text?: string }).text,
+          speaker: (beat as { speaker?: string }).speaker,
+        }];
       }
       // 특정 문항으로 고정한 자리
-      if (beat.slot.id) {
-        const fixed = ALL_QUESTIONS.find(x => x.id === beat.slot.id);
-        if (fixed && !used.has(fixed.id)) {
+      if (beat.id) {
+        const fixed = QUESTIONS.find(q => q.id === beat.id);
+        if (fixed && !used.has(fixed.id) && canAsk(fixed, traits)) {
           used.add(fixed.id);
           return [{ kind: 'question' as const, question: fixed }];
         }
       }
-      const picked = take(beat.slot.from);
+      const picked = take(beat.pick);
       // 채울 문항이 없으면 그 자리는 조용히 건너뛴다 (빈 화면보다 낫다)
       return picked ? [{ kind: 'question' as const, question: picked }] : [];
     }),
   }));
 }
 
-/** 진행률 표시용 — 실제로 출제된 문항 수 */
-export function countQuestions(scenes: ResolvedScene[]): number {
-  return scenes.reduce((n, s) => n + s.beats.filter(b => b.kind === 'question').length, 0);
-}
-
-/** 아직 답하지 않은 문항이 있는지 */
-export function unanswered(scenes: ResolvedScene[], answers: Answers): number {
-  let n = 0;
+/** 실제로 출제된 문항들 */
+export function askedQuestions(scenes: ResolvedScene[]): Question[] {
+  const out: Question[] = [];
   for (const s of scenes) {
-    for (const b of s.beats) {
-      if (b.kind === 'question' && b.question && answers[b.question.id] == null) n++;
-    }
+    for (const b of s.beats) if (b.kind === 'question' && b.question) out.push(b.question);
   }
-  return n;
+  return out;
 }

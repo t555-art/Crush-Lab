@@ -1,122 +1,150 @@
 /**
- * Crush Lab 코어 타입
+ * Crush Lab — 데이터 계약
  *
- * 여기 있는 모양은 v1에서 검증된 것들이라 그대로 가져왔다.
- * 반대로 "장면(Scene)"은 v2에서 새로 생긴 개념이다 —
- * v1은 문항을 무작위로 나열했지만 v2는 하루의 서사 위에 문항을 얹는다.
+ * ⚠️ 여기 있는 모양은 전부 **제안이지 확정이 아니다.**
+ *    문항을 설계하다가 안 맞으면 이 파일을 고쳐라. 코드가 데이터를 따라가야지
+ *    데이터가 코드에 맞출 이유가 없다. (docs/HANDOFF.md 참고)
+ *
+ * 지금 담겨 있는 건 "이런 것들이 필요하다고 들었다" 수준의 뼈대다.
+ *   · 선택지형 문항과 슬라이더형 문항
+ *   · 답변이 쌓이면서 아바타가 구체화되는 구조
+ *   · 좋아하는 상대의 묘사가 답변에 따라 갈라지는 구조
+ *   · 조건부 출제
  */
 
-/* ── 성향 축 ───────────────────────────────────────────── */
-export type AxisKey = 'sp' | 'ex' | 'st' | 'iv';
-export const AXIS_KEYS: AxisKey[] = ['sp', 'ex', 'st', 'iv'];
+/* ── 축 ────────────────────────────────────────────────
+   몇 개를 둘지, 뭘 잴지 전부 자유다. 4개여야 할 이유는 없다. */
 
-/** 유형 코드를 만들지는 않지만 결과지 문장을 고르는 데 쓰는 보조 축 */
-export type SubAxisKey = 'conf' | 'pop' | 'peer';
+export type AxisId = string;
 
 export interface Axis {
+  id: AxisId;
+  /** '속도' 같은 축 이름 */
   name: string;
-  pos: string;
-  neg: string;
+  /** 양수 방향 라벨. '금사빠' */
   posLabel: string;
+  /** 음수 방향 라벨. '늦사빠' */
   negLabel: string;
-  desc: string;
+  /** 이 축이 무엇을 재는지 (결과지에 쓸 수도 있고 안 쓸 수도) */
+  desc?: string;
 }
 
-/* ── 문항 ─────────────────────────────────────────────── */
-export interface Choice {
-  /** 선택지 문구 */
-  t: string;
-  /** v1 아이콘 이름. v2 UI는 아직 안 쓰지만 데이터는 보존한다 */
-  ic?: string;
-  /** 축 점수 */
-  s?: Partial<Record<AxisKey, number>>;
-  /** 보조 축 점수 */
-  s2?: Partial<Record<SubAxisKey, number>>;
-  /** 결과지용 태그. 'trigger:humor' 같은 꼴 */
-  k?: string[];
-}
+/** 문항이 축에 주는 점수. { speed: 2, express: -1 } */
+export type AxisScore = Record<AxisId, number>;
 
-/** 자기소개 답변으로 출제 여부를 거르는 조건 */
-export interface Need {
-  g?: string;
-  grade?: string[];
-  school?: string;
-  exp?: string[];
-  status?: string[];
-  social?: string[];
-}
+/* ── 특성 ──────────────────────────────────────────────
+   답변이 쌓아 올리는 값들. 아바타 그림, 상대 묘사, 다음 문항 출제에 쓴다.
+   키 이름은 자유. gender / confidence / school 처럼 쓰면 된다. */
 
-export interface Question {
-  id: string;
-  /** v1의 챕터 번호(1~7). v2에서는 장면 매핑의 힌트로만 쓴다 */
-  ch: number;
-  q: string;
-  o: Choice[];
-  need?: Need;
-  /** 같은 태그를 가진 문항끼리 모순을 검사한다 */
-  pair?: string;
-  /** 이성친구 ↔ 좋아하는 사람 대조쌍 */
-  mirror?: string;
-  cf?: string;
-}
-
-/** 문항 뱅크 = src/data/questions/ 아래 파일 하나 */
-export type BankId =
-  | 'ch1-me' | 'ch2-pull' | 'ch3-crush' | 'ch4-some'
-  | 'ch5-ask' | 'ch6-dating' | 'ch7-after' | 'pool-extra';
-
-/* ── 자기소개 ─────────────────────────────────────────── */
-export interface IntroOption { v: string; t: string; ic?: string }
-export interface IntroQuestion { id: string; q: string; opts: IntroOption[] }
-/** { gender:'f', grade:'2', ... } */
-export type IntroAnswers = Record<string, string>;
-
-/* ── 장면 (v2 신규) ───────────────────────────────────── */
+export type Traits = Record<string, string>;
 
 /**
- * 배경 일러스트 자리.
- * 지금은 전부 자리표시자 SVG를 가리킨다. 제미나이로 실제 그림을 만들면
- * src만 갈아끼우면 되고, prompt는 그 생성에 쓸 지시문이다.
+ * 출제 조건.
+ * { gender: 'f' }            → 여성 응답자에게만
+ * { confidence: ['low','mid'] } → 둘 중 하나면
+ * 여러 키를 쓰면 전부 만족해야 한다.
  */
+export type Condition = Record<string, string | string[]>;
+
+/* ── 문항 ────────────────────────────────────────────── */
+
+interface QuestionBase {
+  id: string;
+  /** 화면에 뜨는 질문. 줄바꿈은 \n */
+  text: string;
+  /** 분류·검색용 자유 태그. 'morning', 'first-move' 등 */
+  tags?: string[];
+  /** 이 조건을 만족할 때만 출제 */
+  show?: Condition;
+}
+
+/** 선택지를 고르는 문항 */
+export interface ChoiceQuestion extends QuestionBase {
+  kind: 'choice';
+  options: Choice[];
+}
+
+export interface Choice {
+  text: string;
+  /** 축 점수 */
+  score?: Partial<AxisScore>;
+  /** 이 선택지를 고르면 붙는 특성 (아바타·분기에 쓰인다) */
+  traits?: Traits;
+}
+
+/**
+ * 슬라이더로 답하는 문항.
+ * "매우 그렇다 ~ 전혀 아니다" 처럼 한 축을 따라 정도만 묻는 경우에 쓴다.
+ * 선택지를 네 개 쓰는 것보다 화면이 짧고 답하기 빠르다.
+ *
+ * 채점: 응답 위치를 -1~+1로 환산해서 weight에 곱한다.
+ * 가운데를 고르면 0점, 끝을 고르면 weight 전부.
+ */
+export interface ScaleQuestion extends QuestionBase {
+  kind: 'scale';
+  /** 왼쪽 끝 라벨. '전혀 아니야' */
+  minLabel: string;
+  /** 오른쪽 끝 라벨. '완전 그래' */
+  maxLabel: string;
+  /** 단계 수. 홀수면 가운데(중립)가 생긴다 */
+  steps: number;
+  /** 오른쪽 끝까지 갔을 때 각 축에 주는 점수 */
+  weight: Partial<AxisScore>;
+}
+
+export type Question = ChoiceQuestion | ScaleQuestion;
+
+/* ── 아바타 ────────────────────────────────────────────
+   답할수록 응답자를 나타내는 그림이 구체화되는 연출.
+   특성이 쌓이면 조건에 맞는 조각이 하나씩 켜진다. */
+
+export interface AvatarLayer {
+  id: string;
+  /** 이 조건일 때 이 조각을 그린다. 비우면 항상 */
+  when?: Condition;
+  /** 이미지 경로 (또는 인라인 SVG 조각) */
+  src: string;
+  /** 겹치는 순서. 낮을수록 뒤 */
+  z: number;
+}
+
+/* ── 그림 자리 ────────────────────────────────────────── */
+
 export interface ArtSlot {
+  /** 기본 그림 */
   src: string;
   alt: string;
-  /** 이미지 생성용 지시문. docs/ART-MANIFEST.md 가 이 값에서 만들어진다 */
-  prompt: string;
+  /**
+   * 조건부 교체. 좋아하는 상대의 성별·특징에 따라 다른 그림을 쓸 때.
+   * 위에서부터 검사해서 먼저 맞는 것을 쓴다.
+   */
+  variants?: { when: Condition; src: string }[];
+  /** 이미지 생성용 지시문 */
+  prompt?: string;
 }
 
-/**
- * 문항 자리.
- * id를 주면 그 문항으로 고정, 안 주면 뱅크에서 알고리즘이 고른다.
- * 문항 선택 규칙을 바꾸고 싶으면 engine/select.ts 만 고치면 된다.
- */
-export interface QuestionSlot {
-  from: BankId;
-  id?: string;
-}
+/* ── 장면 ──────────────────────────────────────────────
+   문항을 서사 위에 얹는 단위. 장면을 안 쓰고 문항만 쭉 내도 된다. */
 
 export type Beat =
-  /** 지문. 화자 없이 상황만 서술 */
+  /** 지문 */
   | { kind: 'narration'; text: string }
-  /** 대사. 화자 이름이 붙는다 */
+  /** 대사 */
   | { kind: 'line'; speaker: string; text: string }
-  /** 문항. 여기서 선택지가 뜬다 */
-  | { kind: 'question'; slot: QuestionSlot };
+  /** 문항 자리. id를 주면 고정, 안 주면 select.ts가 고른다 */
+  | { kind: 'question'; id?: string; pick?: Condition };
 
 export interface Scene {
   id: string;
-  /** '07:10' — 하루의 흐름을 보여주는 표시용 */
-  time: string;
-  /** '내 방' */
-  place: string;
   title: string;
-  art: ArtSlot;
+  /** 부제·시각·장소 등 화면 상단에 띄울 것 (자유) */
+  label?: string;
+  art?: ArtSlot;
   beats: Beat[];
 }
 
 /* ── 진행 상태 ────────────────────────────────────────── */
 
-/** 장면의 문항 자리를 실제 문항으로 채운 결과 */
 export interface ResolvedBeat {
   kind: Beat['kind'];
   text?: string;
@@ -126,43 +154,29 @@ export interface ResolvedBeat {
 
 export interface ResolvedScene {
   id: string;
-  time: string;
-  place: string;
   title: string;
-  art: ArtSlot;
+  label?: string;
+  art?: ArtSlot;
   beats: ResolvedBeat[];
 }
 
-/** 문항 id → 고른 선택지 인덱스 */
+/**
+ * 응답.
+ * 선택지형이면 고른 인덱스, 슬라이더형이면 단계 인덱스(0부터).
+ */
 export type Answers = Record<string, number>;
 
 /* ── 채점 결과 ────────────────────────────────────────── */
-export type Strength = 'edge' | 'mild' | 'clear' | 'strong';
 
 export interface ScoreResult {
-  /** 'FDOA' 같은 4글자 */
-  code: string;
   /** 축별 -1 ~ +1 */
-  norm: Record<AxisKey, number>;
-  norm2: Record<SubAxisKey, number>;
-  strength: Record<AxisKey, Strength>;
-  /** 태그 집계. sub.trigger.humor === 3 꼴 */
-  sub: Record<string, Record<string, number>>;
+  norm: Record<AxisId, number>;
+  /** 축별 확신도 */
+  strength: Record<AxisId, Strength>;
   /** 답한 문항 수 */
   answered: number;
+  /** 쌓인 특성 */
+  traits: Traits;
 }
 
-export interface CrystalType {
-  name: string;
-  gem: string;
-  tag: string;
-  en: string;
-  mz: string;
-  base: string;
-  rim: string;
-  dark: string;
-  shape: string;
-  face: string;
-  why: string;
-  sum: string;
-}
+export type Strength = 'edge' | 'mild' | 'clear' | 'strong';
