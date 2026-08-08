@@ -1,31 +1,33 @@
 import { INTRO } from '../data/intro';
 import { SCENES } from '../data/scenes';
-import { AVATAR_LAYERS } from '../data/avatar';
 import { AXES } from '../data/axes';
-import { QUESTIONS, resolve, askedQuestions, matches } from '../engine/select';
+import { SURVEY } from '../data/survey';
+import { QUESTIONS, resolve, askedQuestions, allAspects } from '../engine/select';
+import { compose, slotsOf, optionsFor, HAS_PARTS } from '../engine/character';
 import { score, axisPercent } from '../engine/score';
 import type {
-  Answers, Question, ResolvedScene, ScaleQuestion, Traits,
+  Answers, ComposedCharacter, Question, ResolvedBeat, ResolvedScene,
+  ScaleQuestion, Traits,
 } from '../engine/types';
 
-const SAVE_KEY = 'crushlab.progress.v3';
+const SAVE_KEY = 'crushlab.progress.v4';
 
 /**
  * 화면 진행.
  *
- * 상태 하나(State) + 그리는 함수 하나(render). 상태가 바뀌면 통째로 다시 그린다.
- * 프레임워크를 얹는 것보다 고치기 쉬워서 이렇게 뒀다.
- *
  * 단계
- *   intro  시작 질문. 답할 때마다 아바타가 한 겹씩 그려진다
- *   scene  본 검사
- *   done   채점 완료
+ *   intro   시작 질문. 답할 때마다 아바타가 한 겹씩 구체화된다
+ *   avatar  아바타 직접 다듬기 (부품이 있을 때만)
+ *   scene   본 검사
+ *   done    채점 완료
  *
- * 콘텐츠(문항·장면·축)가 비어 있으면 그 사실을 화면에 그대로 띄운다.
- * 지금이 그 상태다.
+ * ── 장면에서의 진행 방식 ──
+ * 터치할 때마다 지문·대사가 **하나씩 쌓인다** (지우고 바꾸는 게 아니라 누적).
+ * 앞의 말은 흐려지고 최근 것이 또렷하다.
+ * 대사가 다 나온 뒤에야 질문창이 그 위로 은은하게 떠오른다.
  */
 
-type Stage = 'intro' | 'scene' | 'done';
+type Stage = 'intro' | 'avatar' | 'scene' | 'done';
 
 interface State {
   stage: Stage;
@@ -33,15 +35,16 @@ interface State {
   traits: Traits;
   scenes: ResolvedScene[];
   sceneIndex: number;
-  beatIndex: number;
+  /** 이 장면에서 지금까지 드러난 비트 수 */
+  revealed: number;
   answers: Answers;
-  /** 슬라이더 문항에서 아직 확정 안 한 값 */
+  /** 슬라이더에서 아직 확정 안 한 값 */
   draft: number | null;
 }
 
 const state: State = {
   stage: 'intro', introIndex: 0, traits: {},
-  scenes: [], sceneIndex: 0, beatIndex: 0, answers: {}, draft: null,
+  scenes: [], sceneIndex: 0, revealed: 1, answers: {}, draft: null,
 };
 
 let root: HTMLElement;
@@ -52,13 +55,13 @@ export function mountPlayer(el: HTMLElement) {
   render();
 }
 
-/* ── 저장 / 복구 ───────────────────────────────────────── */
+/* ══ 저장 / 복구 ═════════════════════════════════════════ */
 
 function save() {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       stage: state.stage, introIndex: state.introIndex, traits: state.traits,
-      sceneIndex: state.sceneIndex, beatIndex: state.beatIndex, answers: state.answers,
+      sceneIndex: state.sceneIndex, revealed: state.revealed, answers: state.answers,
     }));
   } catch { /* 시크릿 모드 등에서 막히면 저장 안 함 */ }
 }
@@ -72,93 +75,105 @@ function restore() {
     Object.assign(state, {
       stage: d.stage ?? 'intro', introIndex: d.introIndex ?? 0,
       traits: d.traits ?? {}, sceneIndex: d.sceneIndex ?? 0,
-      beatIndex: d.beatIndex ?? 0, answers: d.answers ?? {},
+      revealed: d.revealed ?? 1, answers: d.answers ?? {},
     });
     // 장면은 저장하지 않고 특성으로 다시 만든다 (같은 특성 → 같은 문항)
-    if (state.stage !== 'intro') state.scenes = resolve(SCENES, state.traits);
+    if (state.stage === 'scene' || state.stage === 'done') {
+      state.scenes = resolve(SCENES, state.traits);
+    }
   } catch { reset(false); }
 }
 
 export function reset(rerender = true) {
   Object.assign(state, {
     stage: 'intro', introIndex: 0, traits: {},
-    scenes: [], sceneIndex: 0, beatIndex: 0, answers: {}, draft: null,
+    scenes: [], sceneIndex: 0, revealed: 1, answers: {}, draft: null,
   });
   try { localStorage.removeItem(SAVE_KEY); } catch { /* noop */ }
   if (rerender) render();
 }
 
-/* ── 진행 ─────────────────────────────────────────────── */
+/* ══ 진행 ════════════════════════════════════════════════ */
 
-const currentScene = () => state.scenes[state.sceneIndex];
-const currentBeat = () => currentScene()?.beats[state.beatIndex];
+const scene = () => state.scenes[state.sceneIndex];
+/** 지금 화면에 드러나 있는 비트들 */
+const shown = (): ResolvedBeat[] => scene()?.beats.slice(0, state.revealed) ?? [];
+/** 가장 최근 비트 */
+const tip = (): ResolvedBeat | undefined => shown()[state.revealed - 1];
 
-function step() {
-  const scene = currentScene();
-  if (!scene) { state.stage = 'done'; save(); render(); return; }
-  if (state.beatIndex < scene.beats.length - 1) state.beatIndex++;
+function startScenes() {
+  state.scenes = resolve(SCENES, state.traits);
+  state.stage = 'scene';
+  state.sceneIndex = 0;
+  state.revealed = 1;
+  save();
+  render();
+}
+
+/** 터치했을 때. 질문이 떠 있으면 무시한다 (답을 해야 넘어감) */
+function advance() {
+  if (state.stage !== 'scene') return;
+  if (tip()?.kind === 'question') return;
+  const s = scene();
+  if (!s) return;
+  if (state.revealed < s.beats.length) state.revealed++;
   else if (state.sceneIndex < state.scenes.length - 1) {
-    state.sceneIndex++; state.beatIndex = 0;
+    state.sceneIndex++; state.revealed = 1;
+  } else { state.stage = 'done'; }
+  state.draft = null;
+  save();
+  render();
+}
+
+function answerIntro(index: number) {
+  const q = INTRO[state.introIndex];
+  state.answers[q.id] = index;
+  const pick = q.options[index];
+  if (pick.traits) Object.assign(state.traits, pick.traits);
+
+  if (state.introIndex < INTRO.length - 1) { state.introIndex++; save(); render(); return; }
+  // 시작 질문이 끝나면, 부품이 있을 때만 아바타 다듬기로
+  state.stage = HAS_PARTS ? 'avatar' : 'scene';
+  if (state.stage === 'avatar') { save(); render(); } else startScenes();
+}
+
+function answerQuestion(q: Question, value: number) {
+  state.answers[q.id] = value;
+  advanceAfterAnswer();
+}
+
+function advanceAfterAnswer() {
+  const s = scene();
+  if (!s) { state.stage = 'done'; save(); render(); return; }
+  if (state.revealed < s.beats.length) state.revealed++;
+  else if (state.sceneIndex < state.scenes.length - 1) {
+    state.sceneIndex++; state.revealed = 1;
   } else state.stage = 'done';
   state.draft = null;
   save();
   render();
 }
 
-/** 탭했을 때. 문항이 떠 있으면 무시한다 (답을 해야 넘어감) */
-function advance() {
-  if (state.stage !== 'scene') return;
-  if (currentBeat()?.kind === 'question') return;
-  step();
-}
-
-function answerIntro(index: number) {
-  const q = INTRO[state.introIndex];
-  const pick = q.options[index];
-  state.answers[q.id] = index;
-  if (pick.traits) Object.assign(state.traits, pick.traits);
-
-  if (state.introIndex < INTRO.length - 1) state.introIndex++;
-  else {
-    state.scenes = resolve(SCENES, state.traits);
-    state.stage = 'scene';
-    state.sceneIndex = 0; state.beatIndex = 0;
-  }
-  save();
-  render();
-}
-
-function answerQuestion(q: Question, value: number) {
-  state.answers[q.id] = value;
-  step();
-}
-
 export function result() {
   return score(askedQuestions(state.scenes), state.answers, state.traits);
 }
 
-/* ── 그리기 ───────────────────────────────────────────── */
+/* ══ 그리기 ══════════════════════════════════════════════ */
 
 const esc = (s: string) =>
   String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 const text = (s: string) => esc(s).replace(/\n/g, '<br>');
 
-/**
- * 지금까지 쌓인 특성으로 아바타를 그린다.
- * 조각이 하나도 없으면(지금) 아무것도 안 그린다.
- */
-function avatarHtml(): string {
-  const on = AVATAR_LAYERS
-    .filter(l => matches(l.when, state.traits))
-    .sort((a, b) => a.z - b.z);
-  if (!on.length) return '';
-  return '<div class="avatar">' +
-    on.map(l => `<img class="avatar__l" src="${esc(l.src)}" alt="" style="z-index:${l.z}">`).join('') +
+/** 조립된 인물 하나를 겹쳐 그린다 */
+function figureHtml(c: ComposedCharacter, cls = 'figure'): string {
+  if (!c.layers.length) return '';
+  return `<div class="${cls}">` +
+    c.layers.map(l =>
+      `<img class="figure__p" src="${esc(l.src)}" alt="" style="z-index:${l.z}">`).join('') +
     '</div>';
 }
 
 function render() {
-  // 콘텐츠가 비어 있으면 그 사실을 먼저 알린다
   const missing: string[] = [];
   if (!AXES.length) missing.push('축 (<code>src/data/axes.ts</code>)');
   if (!QUESTIONS.length) missing.push('문항 (<code>src/data/questions.ts</code>)');
@@ -166,6 +181,7 @@ function render() {
   if (missing.length) return renderEmpty(missing);
 
   if (state.stage === 'intro') return renderIntro();
+  if (state.stage === 'avatar') return renderAvatar();
   if (state.stage === 'scene') return renderScene();
   return renderDone();
 }
@@ -176,27 +192,27 @@ function renderEmpty(missing: string[]) {
     <div class="form">
       <p class="step">아직 콘텐츠가 없음</p>
       <h1 class="ask">검사할 내용이 비어 있어</h1>
-      <p class="note">
-        화면과 채점 엔진은 다 돌아가는데, 들어갈 내용이 아직 없어.
-        아래 파일을 채우면 바로 동작해.
-      </p>
+      <p class="note">화면·채점·연출은 다 돌아가는데, 들어갈 내용이 아직 없어.</p>
       <ul class="note" style="padding-left:18px;display:flex;flex-direction:column;gap:6px">
         ${missing.map(m => `<li>${m}</li>`).join('')}
       </ul>
-      <p class="note">자세한 건 <code>docs/HANDOFF.md</code> 를 볼 것.</p>
+      <p class="note">채우는 방법은 <code>docs/HANDOFF.md</code> 에 있어.</p>
       <div class="choices"><a class="choice" href="/">처음으로</a></div>
     </div>`;
 }
 
+/* ── 시작 질문 — 답할수록 아바타가 구체화된다 ──────────── */
 function renderIntro() {
   const q = INTRO[state.introIndex];
   const pct = (state.introIndex / INTRO.length) * 100;
+  const me = compose(state.traits, 'self');
+
   root.className = 'stage stage--form';
   root.innerHTML = `
-    <div class="form">
+    <div class="form form--intro">
       <div class="bar"><div class="bar__fill" style="width:${pct}%"></div></div>
       <p class="step">${state.introIndex + 1} / ${INTRO.length}</p>
-      ${avatarHtml()}
+      <div class="mecanvas">${figureHtml(me, 'figure figure--me')}</div>
       <h1 class="ask">${text(q.text)}</h1>
       <div class="choices">
         ${q.options.map((o, i) => `<button class="choice" data-i="${i}">${esc(o.text)}</button>`).join('')}
@@ -207,28 +223,85 @@ function renderIntro() {
   });
 }
 
-function renderScene() {
-  const scene = currentScene();
-  const beat = currentBeat();
-  if (!scene || !beat) { state.stage = 'done'; return render(); }
+/* ── 아바타 직접 다듬기 ────────────────────────────────
+   자동으로 정해진 것 위에, 마음에 안 드는 부분만 사용자가 바꾼다.
+   고른 값은 traits 에 `self.<슬롯>` 으로 저장되어 자동 선택보다 우선한다. */
+function renderAvatar() {
+  const me = compose(state.traits, 'self');
+  const slots = slotsOf('self').filter(s => optionsFor(s, 'self').length > 1);
 
+  root.className = 'stage stage--form';
+  root.innerHTML = `
+    <div class="form">
+      <p class="step">내 모습</p>
+      <div class="mecanvas">${figureHtml(me, 'figure figure--me')}</div>
+      <h1 class="ask">이게 너야</h1>
+      <p class="note">바꾸고 싶은 게 있으면 골라. 그냥 넘어가도 돼.</p>
+      ${slots.map(slot => {
+        const opts = optionsFor(slot, 'self');
+        const cur = me.layers.find(l => l.slot === slot)?.id;
+        return `<div class="picker">
+          <p class="picker__k">${esc(opts[0].label ? slot : slot)}</p>
+          <div class="picker__row">
+            ${opts.map(o => `<button class="picker__b${o.id === cur ? ' on' : ''}"
+              data-slot="${esc(slot)}" data-id="${esc(o.id)}">${esc(o.label ?? o.id)}</button>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+      <div class="choices"><button class="choice" id="go">이대로 시작</button></div>
+    </div>`;
+
+  root.querySelectorAll<HTMLButtonElement>('.picker__b').forEach(b => {
+    b.addEventListener('click', () => {
+      state.traits[`self.${b.dataset.slot}`] = b.dataset.id!;
+      save(); renderAvatar();
+    });
+  });
+  root.querySelector('#go')?.addEventListener('click', startScenes);
+}
+
+/* ── 장면 ──────────────────────────────────────────────
+   터치하면 대사가 하나씩 쌓이고, 다 나온 뒤 질문창이 위로 떠오른다. */
+function renderScene() {
+  const s = scene();
+  if (!s) { state.stage = 'done'; return render(); }
+  const beats = shown();
+  const last = tip();
+  if (!last) { state.stage = 'done'; return render(); }
+
+  const q = last.kind === 'question' ? last.question : undefined;
   const total = askedQuestions(state.scenes).length;
-  const done = Object.keys(state.answers).filter(id => QUESTIONS.some(q => q.id === id)).length;
-  const q = beat.kind === 'question' ? beat.question : undefined;
+  const done = Object.keys(state.answers).filter(id => QUESTIONS.some(x => x.id === id)).length;
+
+  // 대사는 최근 3개까지만 보인다. 그 이상은 화면을 먹는다
+  const talk = beats.filter(b => b.kind !== 'question').slice(-3);
 
   root.className = 'stage stage--scene';
   root.innerHTML = `
     <div class="scene">
-      ${scene.art ? `<img class="scene__art" src="${esc(scene.art.src)}" alt="${esc(scene.art.alt)}">` : ''}
+      ${s.background ? `<img class="scene__art" src="${esc(s.background.src)}" alt="${esc(s.background.alt)}">` : ''}
       <div class="scene__veil"></div>
+
+      ${s.cast.map(c => `<div class="cast" style="
+          left:${c.x}%; top:${c.y}%;
+          --s:${c.scale ?? 1}; ${c.flip ? '--flip:-1;' : ''}
+        ">${figureHtml(c.character)}</div>`).join('')}
+
       <header class="scene__head">
-        ${scene.label ? `<span class="place">${esc(scene.label)}</span>` : ''}
+        ${s.label ? `<span class="place">${esc(s.label)}</span>` : ''}
         <span class="tally">${done} / ${total}</span>
       </header>
-      <div class="box ${q ? 'box--ask' : ''}">
-        ${beat.kind === 'line' && beat.speaker ? `<p class="who">${esc(beat.speaker)}</p>` : ''}
-        ${q ? questionHtml(q) : `<p class="line">${text(beat.text ?? '')}</p><span class="next"></span>`}
+
+      ${q ? `<div class="askcard">${questionHtml(q)}</div>` : ''}
+
+      <div class="talk">
+        ${talk.map((b, i) => `<div class="talk__l${i === talk.length - 1 && !q ? ' talk__l--now' : ''}">
+          ${b.kind === 'line' && b.speaker ? `<p class="who">${esc(b.speaker)}</p>` : ''}
+          <p class="line">${text(b.text ?? '')}</p>
+        </div>`).join('')}
+        ${q ? '' : '<span class="next"></span>'}
       </div>
+
       ${q ? '' : '<button class="tapzone" aria-label="다음"></button>'}
     </div>`;
 
@@ -238,7 +311,7 @@ function renderScene() {
 
 function questionHtml(q: Question): string {
   if (q.kind === 'choice') {
-    return `<p class="line">${text(q.text)}</p>
+    return `<p class="askcard__q">${text(q.text)}</p>
       <div class="choices">
         ${q.options.map((o, i) => `<button class="choice" data-i="${i}">${esc(o.text)}</button>`).join('')}
       </div>`;
@@ -248,18 +321,13 @@ function questionHtml(q: Question): string {
 
 /**
  * 슬라이더 문항.
- * 손가락으로 끌고 → 확인. 선택지 여러 개보다 화면이 짧다.
- * 실제로 써보고 조작이 불편하면 단계별 버튼 한 줄로 바꾸는 것도 방법이다.
+ * 트랙 전체가 48px 높이라 끌기·탭 둘 다 편하다.
  */
 function scaleHtml(q: ScaleQuestion): string {
-  const mid = Math.floor(q.steps / 2);
-  const v = state.draft ?? mid;
-  return `<p class="line">${text(q.text)}</p>
+  const v = state.draft ?? Math.floor(q.steps / 2);
+  return `<p class="askcard__q">${text(q.text)}</p>
     <div class="scale">
-      <div class="scale__ends">
-        <span>${esc(q.minLabel)}</span>
-        <span>${esc(q.maxLabel)}</span>
-      </div>
+      <div class="scale__ends"><span>${esc(q.minLabel)}</span><span>${esc(q.maxLabel)}</span></div>
       <div class="scale__track">
         <div class="scale__ticks">
           ${Array.from({ length: q.steps }, (_, i) =>
@@ -275,7 +343,7 @@ function scaleHtml(q: ScaleQuestion): string {
 
 function wireQuestion(q: Question) {
   if (q.kind === 'choice') {
-    root.querySelectorAll<HTMLButtonElement>('.choice').forEach(b => {
+    root.querySelectorAll<HTMLButtonElement>('.askcard .choice').forEach(b => {
       b.addEventListener('click', () => answerQuestion(q, Number(b.dataset.i)));
     });
     return;
@@ -291,14 +359,17 @@ function wireQuestion(q: Question) {
   });
 }
 
+/* ── 결과 ─────────────────────────────────────────────── */
 function renderDone() {
   const r = result();
+  const aspects = allAspects();
   root.className = 'stage stage--form';
   root.innerHTML = `
     <div class="form">
       <p class="step">검사 완료</p>
       <h1 class="ask">${r.answered}개 문항에 답했어</h1>
-      <p class="note">결과 화면은 아직 만드는 중이야.</p>
+      <p class="note">결과 화면은 아직 만드는 중이야. (유형·설명은 내용 작업 대기)</p>
+
       ${AXES.length ? `<div class="gauges">${AXES.map(a => {
         const pct = axisPercent(r.norm[a.id] ?? 0);
         return `<div class="gauge">
@@ -308,6 +379,17 @@ function renderDone() {
           <span class="gauge__v">${pct}</span>
         </div>`;
       }).join('')}</div>` : ''}
+
+      ${aspects.length ? `<p class="step" style="margin-top:8px">항목별 문항 수</p>
+        <div class="gauges">${aspects.map(a => {
+          const n = r.perAspect[a] ?? 0;
+          const ok = n >= SURVEY.minPerAspect;
+          return `<div class="gauge">
+            <span class="gauge__k">${esc(a)}</span>
+            <span class="gauge__v" style="width:auto">${n}문항${ok ? '' : ' (부족)'}</span>
+          </div>`;
+        }).join('')}</div>` : ''}
+
       <div class="choices"><button class="choice" id="again">처음부터 다시</button></div>
     </div>`;
   root.querySelector('#again')?.addEventListener('click', () => reset());
@@ -316,7 +398,7 @@ function renderDone() {
 /* 키보드로도 넘길 수 있게 */
 document.addEventListener('keydown', e => {
   if ((e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight')
-      && state.stage === 'scene' && currentBeat()?.kind !== 'question') {
+      && state.stage === 'scene' && tip()?.kind !== 'question') {
     e.preventDefault();
     advance();
   }

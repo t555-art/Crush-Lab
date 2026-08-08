@@ -1,60 +1,86 @@
 /**
  * Crush Lab — 데이터 계약
  *
- * ⚠️ 여기 있는 모양은 전부 **제안이지 확정이 아니다.**
- *    문항을 설계하다가 안 맞으면 이 파일을 고쳐라. 코드가 데이터를 따라가야지
- *    데이터가 코드에 맞출 이유가 없다. (docs/HANDOFF.md 참고)
+ * ⚠️ 여기 있는 모양은 **제안이지 확정이 아니다.**
+ *    문항을 설계하다가 안 맞으면 고쳐라. 코드가 데이터를 따라가야 한다.
  *
- * 지금 담겨 있는 건 "이런 것들이 필요하다고 들었다" 수준의 뼈대다.
- *   · 선택지형 문항과 슬라이더형 문항
- *   · 답변이 쌓이면서 아바타가 구체화되는 구조
- *   · 좋아하는 상대의 묘사가 답변에 따라 갈라지는 구조
- *   · 조건부 출제
+ * ── 역할 분담 ──────────────────────────────────────────
+ *   내용·미술 (문항, 스토리, 결과 텍스트, 그림)  → 친구 쪽
+ *   기능      (이 파일, 엔진, 화면, 알고리즘)     → 코드 쪽
+ *   상대 담당인 일은 직접 하지 말고 요청할 것. docs/HANDOFF.md 참고.
  */
 
-/* ── 축 ────────────────────────────────────────────────
-   몇 개를 둘지, 뭘 잴지 전부 자유다. 4개여야 할 이유는 없다. */
+/* ══ 축 ══════════════════════════════════════════════════
+   무엇을 재는가. 개수 자유. */
 
 export type AxisId = string;
 
 export interface Axis {
   id: AxisId;
-  /** '속도' 같은 축 이름 */
   name: string;
-  /** 양수 방향 라벨. '금사빠' */
   posLabel: string;
-  /** 음수 방향 라벨. '늦사빠' */
   negLabel: string;
-  /** 이 축이 무엇을 재는지 (결과지에 쓸 수도 있고 안 쓸 수도) */
   desc?: string;
 }
 
-/** 문항이 축에 주는 점수. { speed: 2, express: -1 } */
 export type AxisScore = Record<AxisId, number>;
 
-/* ── 특성 ──────────────────────────────────────────────
-   답변이 쌓아 올리는 값들. 아바타 그림, 상대 묘사, 다음 문항 출제에 쓴다.
-   키 이름은 자유. gender / confidence / school 처럼 쓰면 된다. */
+/* ══ 특성 ════════════════════════════════════════════════
+   답변이 쌓아 올리는 값. 세 곳에 쓰인다.
+     1. 아바타·상대 캐릭터의 부품 선택
+     2. 어떤 문항을 낼지 거르는 조건
+     3. 어떤 장면을 보여줄지
+
+   키 이름은 자유다. 다만 상대 캐릭터에 관한 것은 `crush.` 를 앞에 붙인다.
+     { gender: 'f', 'crush.gender': 'm' }
+   그래야 같은 부품 시스템으로 두 인물을 따로 조립할 수 있다.
+
+   사용자가 아바타를 직접 고친 경우 `self.<슬롯>` 으로 저장된다.
+     { 'self.hair': 'hair-long' }   ← 자동 선택보다 우선한다 */
 
 export type Traits = Record<string, string>;
 
 /**
- * 출제 조건.
- * { gender: 'f' }            → 여성 응답자에게만
- * { confidence: ['low','mid'] } → 둘 중 하나면
- * 여러 키를 쓰면 전부 만족해야 한다.
+ * 조건.
+ *   { gender: 'f' }                  여성 응답자에게만
+ *   { school: ['co', 'girls'] }      둘 중 하나면
+ *   여러 키를 쓰면 전부 만족해야 한다.
+ *
+ * 값 앞에 `!` 를 붙이면 부정이다.
+ *   { school: '!boys' }              남고가 아닐 때만
  */
 export type Condition = Record<string, string | string[]>;
 
-/* ── 문항 ────────────────────────────────────────────── */
+/* ══ 문항 ════════════════════════════════════════════════ */
 
 interface QuestionBase {
   id: string;
   /** 화면에 뜨는 질문. 줄바꿈은 \n */
   text: string;
-  /** 분류·검색용 자유 태그. 'morning', 'first-move' 등 */
+
+  /**
+   * 역할 — 이 문항이 무엇을 보는지.
+   * 출제할 때 역할별로 고르게 나가도록 하는 데 쓴다.
+   * 비워두면 점수를 주는 축에서 자동으로 유추한다.
+   * 예: 'confidence', 'initiative'
+   */
+  aspect?: string;
+
+  /**
+   * 어느 시간대·장면에 어울리는가.
+   * 출제기가 이 값을 보고 그 장면에 맞는 문항만 고른다.
+   * 예: ['morning', 'classroom']
+   */
+  slots?: string[];
+
+  /** 분류·검색용 자유 태그 */
   tags?: string[];
-  /** 이 조건을 만족할 때만 출제 */
+
+  /**
+   * 출제 조건. 이게 필터링의 핵심이다.
+   * 남고 다니는데 복도에서 좋아하는 애를 마주치는 상황은 존재할 수 없다 —
+   * 그런 문항에 `show: { school: '!boys' }` 를 걸어두면 안 나간다.
+   */
   show?: Condition;
 }
 
@@ -66,84 +92,116 @@ export interface ChoiceQuestion extends QuestionBase {
 
 export interface Choice {
   text: string;
-  /** 축 점수 */
   score?: Partial<AxisScore>;
-  /** 이 선택지를 고르면 붙는 특성 (아바타·분기에 쓰인다) */
+  /** 이 선택지를 고르면 붙는 특성 */
   traits?: Traits;
 }
 
 /**
  * 슬라이더로 답하는 문항.
- * "매우 그렇다 ~ 전혀 아니다" 처럼 한 축을 따라 정도만 묻는 경우에 쓴다.
- * 선택지를 네 개 쓰는 것보다 화면이 짧고 답하기 빠르다.
- *
- * 채점: 응답 위치를 -1~+1로 환산해서 weight에 곱한다.
- * 가운데를 고르면 0점, 끝을 고르면 weight 전부.
+ * "매우 그렇다 ~ 전혀 아니다" 류. 선택지 네 개보다 화면이 짧고 빠르다.
+ * 응답 위치를 -1~+1로 환산해 weight 를 곱한다.
  */
 export interface ScaleQuestion extends QuestionBase {
   kind: 'scale';
-  /** 왼쪽 끝 라벨. '전혀 아니야' */
   minLabel: string;
-  /** 오른쪽 끝 라벨. '완전 그래' */
   maxLabel: string;
   /** 단계 수. 홀수면 가운데(중립)가 생긴다 */
   steps: number;
-  /** 오른쪽 끝까지 갔을 때 각 축에 주는 점수 */
   weight: Partial<AxisScore>;
 }
 
 export type Question = ChoiceQuestion | ScaleQuestion;
 
-/* ── 아바타 ────────────────────────────────────────────
-   답할수록 응답자를 나타내는 그림이 구체화되는 연출.
-   특성이 쌓이면 조건에 맞는 조각이 하나씩 켜진다. */
+/* ══ 캐릭터 조립 ══════════════════════════════════════════
+   완성된 그림 한 장을 넣는 게 아니라, 부품을 겹쳐서 만든다.
+   응답자 아바타와 스토리 속 상대가 **같은 시스템**을 쓴다.
 
-export interface AvatarLayer {
+   슬롯(slot) = 부품 자리. 'body' | 'hair' | 'face' | 'uniform' …
+   슬롯마다 조건에 맞는 부품이 하나씩 선택되어 z 순서로 겹쳐진다. */
+
+export interface PartOption {
   id: string;
-  /** 이 조건일 때 이 조각을 그린다. 비우면 항상 */
-  when?: Condition;
-  /** 이미지 경로 (또는 인라인 SVG 조각) */
+  /** 부품 자리 */
+  slot: string;
   src: string;
   /** 겹치는 순서. 낮을수록 뒤 */
   z: number;
+  /** 이 조건일 때 자동 선택 (없으면 그 슬롯의 기본값) */
+  when?: Condition;
+  /** 직접 고르는 화면에 뜨는 이름 */
+  label?: string;
+  /** 누구에게 쓰는 부품인가 */
+  for?: 'self' | 'crush' | 'both';
 }
 
-/* ── 그림 자리 ────────────────────────────────────────── */
+/** 조립된 결과 — 그릴 준비가 된 상태 */
+export interface ComposedCharacter {
+  who: CastRole;
+  layers: { id: string; slot: string; src: string; z: number }[];
+}
+
+export type CastRole = 'self' | 'crush' | string;
+
+/* ══ 장면 ════════════════════════════════════════════════ */
 
 export interface ArtSlot {
-  /** 기본 그림 */
   src: string;
   alt: string;
-  /**
-   * 조건부 교체. 좋아하는 상대의 성별·특징에 따라 다른 그림을 쓸 때.
-   * 위에서부터 검사해서 먼저 맞는 것을 쓴다.
-   */
+  /** 조건부 교체. 위에서부터 먼저 맞는 것을 쓴다 */
   variants?: { when: Condition; src: string }[];
   /** 이미지 생성용 지시문 */
   prompt?: string;
 }
 
-/* ── 장면 ──────────────────────────────────────────────
-   문항을 서사 위에 얹는 단위. 장면을 안 쓰고 문항만 쭉 내도 된다. */
+/** 장면에 세워지는 인물 */
+export interface CastMember {
+  who: CastRole;
+  /** 화면 내 위치 (%) — 0~100 */
+  x: number;
+  y: number;
+  /** 크기 배율. 1이 기본 */
+  scale?: number;
+  /** 좌우 반전 */
+  flip?: boolean;
+  /** 이 조건일 때만 등장 */
+  when?: Condition;
+}
 
 export type Beat =
   /** 지문 */
   | { kind: 'narration'; text: string }
   /** 대사 */
   | { kind: 'line'; speaker: string; text: string }
-  /** 문항 자리. id를 주면 고정, 안 주면 select.ts가 고른다 */
-  | { kind: 'question'; id?: string; pick?: Condition };
+  /** 문항 자리 */
+  | { kind: 'question'; id?: string; pick?: QuestionPick };
+
+/** 이 자리에 어떤 문항을 넣을지 */
+export interface QuestionPick {
+  /** 이 시간대·장면 태그를 가진 문항 중에서 */
+  slot?: string;
+  /** 이 역할을 보는 문항 중에서 */
+  aspect?: string;
+  /** 추가 조건 */
+  tags?: string | string[];
+}
 
 export interface Scene {
   id: string;
   title: string;
-  /** 부제·시각·장소 등 화면 상단에 띄울 것 (자유) */
+  /** 화면 상단에 띄울 것. 시각·장소 등 자유 */
   label?: string;
-  art?: ArtSlot;
+  /** 이 장면의 시간대 태그. 문항 고를 때 기본값으로 쓰인다 */
+  slot?: string;
+  /** 이 조건일 때만 이 장면이 나온다 (남고면 특정 장면 통째로 제외 등) */
+  when?: Condition;
+  background?: ArtSlot;
+  /** 이 장면에 서 있는 인물들 */
+  cast?: CastMember[];
   beats: Beat[];
 }
 
-/* ── 진행 상태 ────────────────────────────────────────── */
+/* ══ 진행 상태 ════════════════════════════════════════════ */
 
 export interface ResolvedBeat {
   kind: Beat['kind'];
@@ -156,8 +214,13 @@ export interface ResolvedScene {
   id: string;
   title: string;
   label?: string;
-  art?: ArtSlot;
+  background?: ArtSlot;
+  cast: ComposedCast[];
   beats: ResolvedBeat[];
+}
+
+export interface ComposedCast extends Omit<CastMember, 'when'> {
+  character: ComposedCharacter;
 }
 
 /**
@@ -166,17 +229,15 @@ export interface ResolvedScene {
  */
 export type Answers = Record<string, number>;
 
-/* ── 채점 결과 ────────────────────────────────────────── */
-
-export interface ScoreResult {
-  /** 축별 -1 ~ +1 */
-  norm: Record<AxisId, number>;
-  /** 축별 확신도 */
-  strength: Record<AxisId, Strength>;
-  /** 답한 문항 수 */
-  answered: number;
-  /** 쌓인 특성 */
-  traits: Traits;
-}
+/* ══ 채점 결과 ════════════════════════════════════════════ */
 
 export type Strength = 'edge' | 'mild' | 'clear' | 'strong';
+
+export interface ScoreResult {
+  norm: Record<AxisId, number>;
+  strength: Record<AxisId, Strength>;
+  answered: number;
+  traits: Traits;
+  /** 역할별로 몇 문항씩 물었는지 — 결과 신뢰도를 보여줄 때 쓴다 */
+  perAspect: Record<string, number>;
+}
