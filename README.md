@@ -25,7 +25,7 @@ src/data/axes.ts       무엇을 잴 것인가
 src/data/intro.ts      시작 질문 (아바타 재료를 모으는 곳)
 src/data/questions.ts  본 문항
 src/data/scenes.ts     서사 (비워도 검사는 돌아간다)
-src/data/avatar.ts     아바타 조각
+src/data/parts.ts      캐릭터 부품 (자기 · 상대)
 ```
 
 ---
@@ -43,6 +43,8 @@ npm run dev      # http://localhost:4321
 | `npm run build` | `dist/` 에 정적 HTML을 뽑는다 |
 | `npm run preview` | 빌드 결과 확인 |
 | `npm run check:questions` | **문항 손봤으면 반드시** — 안 나가는 문항, 출제량 편차 등을 잡는다 |
+| `npm run check:art` | **그림 넣었으면 반드시** — 규격·투명배경·기준선 어긋남을 잡는다 |
+| `npm run art:guide` | 부품 정렬 가이드 재생성 |
 
 ## 어디를 고치면 되나
 
@@ -52,7 +54,7 @@ npm run dev      # http://localhost:4321
 | 문항 쓰기 | `src/data/questions.ts` |
 | 시작 질문 쓰기 | `src/data/intro.ts` |
 | 서사 쓰기 | `src/data/scenes.ts` |
-| 아바타 조각 붙이기 | `src/data/avatar.ts` |
+| 캐릭터 부품 붙이기 | `src/data/parts.ts` → `/art` 에서 확인 |
 | 문항 뽑는 규칙 | `src/engine/select.ts` |
 | 데이터 모양 자체 | `src/engine/types.ts` — 안 맞으면 고쳐도 된다 |
 | 색·글꼴 | `src/styles/app.css` 맨 위 토큰 |
@@ -62,6 +64,7 @@ npm run dev      # http://localhost:4321
 ## 문서
 
 - **[인수인계](docs/HANDOFF.md)** — 문항 설계를 맡았다면 여기부터
+- **[그림 규격](docs/ART-SPEC.md)** — 이미지 생성 전에 반드시. 규격이 어긋나면 다시 그려야 한다
 - [진행 기록](docs/PROGRESS.md) — 양쪽이 무엇을 했고 무엇을 정했는지
 - [구조 설명](docs/ARCHITECTURE.md) — 왜 이렇게 짰는지
 - [로드맵](docs/ROADMAP.md) — 어떤 순서로
@@ -157,7 +160,9 @@ npm run dev      # http://localhost:4321
 
 ## 6. 일러스트
 
-- [ ] 아바타 조각 — 조합으로 만들어야 장수가 줄어든다 (머리 3 × 표정 3 = 6장으로 9가지)
+- [x] 부품 규격·정렬 가이드·확인 도구 ([ART-SPEC](docs/ART-SPEC.md))
+- [ ] 스타일 앵커 1장 — 나머지 전부의 기준이 된다
+- [ ] 아바타 부품 — 조합으로 만들어야 장수가 줄어든다 (머리 4 × 체형 3 × 얼굴 4 = 11장으로 48가지)
 - [ ] 장면 배경
 - [ ] 좋아하는 상대 그림 (성별·특징별 분기)
 - [ ] 공유 썸네일
