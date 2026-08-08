@@ -5,38 +5,46 @@ import type { Scene } from '../engine/types';
  * 등교 전 → 학교(교실·급식실·복도) → 하교 후 → 밤 → 주말/학원 → 데이트
  *
  * ── 왜 이 순서인가 ──  ★ 그냥 하루 순서가 아니다
- * 끌림이 실제로 만들어지는 기제가 심리학에서 셋으로 정리돼 있는데,
- * 그게 장소 순서와 그대로 겹친다.
+ * 끌림이 실제로 만들어지는 기제가 셋으로 정리돼 있는데, 장소 순서와 그대로 겹친다.
  *
- *   ① 근접·반복노출(mere exposure) — 가까이 있고 자주 보면 호감이 생긴다
- *        → 교실·급식실·복도. 매일 같은 공간에 있다는 것 자체가 재료다
- *   ② 상호성(reciprocity) — 상대가 나에게 관심 있다는 신호 하나면 끌림이 켜진다
- *        눈길 한 번, 질문 하나, 칭찬 한 마디로 충분하다고 보고돼 있다
- *        → 하교 후. 우연을 가장한 신호가 오가는 자리
- *   ③ 자기개방(self-disclosure) — 속마음을 **서로** 주고받아야 친밀해진다
- *        일방적이면 효과가 없다는 게 반복 검증됐다
- *        → 밤·폰. 낮에 못 하는 말이 여기서 나온다
- *   그다음이 의도적 만남(주말·학원)과 관계 성립(데이트)이다.
+ *   ① 근접·반복노출 — 가까이 있고 자주 보면 그것만으로 호감이 생긴다
+ *        → 교실·급식실·복도
+ *   ② 상호성 — 상대가 관심 있다는 신호 하나면 끌림이 켜진다 (눈길·질문 한 번으로 충분)
+ *        → 하교 후
+ *   ③ 자기개방 — 속마음을 **서로** 주고받아야 친밀해진다. 일방적이면 효과 없음
+ *        → 밤·폰
+ *   그다음이 의도적 만남(주말·학원)과 관계 성립(데이트).
  *
- * 즉 **장소가 사적인 정도 = 관계의 진행도**다.
- * 교실(공개, 또래가 봄) → 하굣길(둘만, 우연) → 폰(사적, 밤) →
- * 주말(의도적 약속) → 데이트(관계 확정).
- * 학년이나 날짜를 세지 않아도 진행이 된다.
+ * 즉 **장소가 사적인 정도 = 관계의 진행도**다. 날짜를 세지 않아도 진행이 된다.
  *
- * ── 분량 ──
- * 장면 10개 × 문항 7개 = 70. 한 명이 답하는 양이 60~70이 되게 잡았다.
- * (SURVEY.maxPerScene 이 8이라 장면당 8을 넘지 못한다)
+ * ── 걔가 학교에 있느냐 없느냐 ──  ★ 여기가 이 파일의 핵심
  *
- * ── slot ──
- * 문항의 `slots` 가 여기 `slot` 값을 가리킨다. 이 이름이 계약이다.
+ * 남고 다니는 사람이 여자를 좋아하면 교실·급식실·복도에 그 사람이 **있을 수가 없다.**
+ * 그런데 이건 school 만으로는 판정이 안 된다 — 남고라도 상대가 남자면 학교에 있다.
+ * (Condition 이 AND 로만 묶여서 그런 OR 조건을 못 쓴다)
+ *
+ * 그래서 시작 질문에서 `meet` 을 직접 물어보고, **그 답을 기준으로 장면을 가른다.**
+ *
+ *   meet: class            같은 반        → 모든 학교 장면에 걔가 있다
+ *   meet: school           다른 반        → 교실엔 없고, 급식실·복도·등하굣길엔 있다
+ *   meet: academy/outside  학교 밖        → 학교 장면에 아예 없다
+ *
+ * 없는 쪽은 **문항을 빼는 게 아니라 다른 이야기를 깐다.** 이유가 있다 —
+ * 매일 못 보는 사람은 근접·반복노출 기제가 통째로 빠져서, 안 움직이면 아무 일도
+ * 안 일어난다. 우연이 없으니 `move`(행동) 축이 결과를 훨씬 크게 좌우하고,
+ * 폰이 보조가 아니라 주무대가 된다. 연애의 모양 자체가 다르다.
+ *
+ * ── 짝 맞추기 규칙 ──
+ * 변형본끼리는 **slot 이 같고 문항 자리 수가 같아야 한다.** 안 그러면 그 사람만
+ * 검사가 짧아지고 채점이 흔들린다. 지금 전부 7개씩이다.
+ * when 조건은 서로 배타적이고 빠짐없이 덮어야 한다.
+ *
+ * ── slot 9개 ──
  *   morning · commute · class · lunch · hall · afterschool · night · weekend · date
- *
- * `weekend` 는 장면이 둘인데 slot 이 같다. 학원에서 보는 사이인 사람과
- * 아닌 사람에게 지문만 다르게 나가고 **문항 수는 똑같이 7개**다.
- * 조건부 장면을 만들 때는 항상 이렇게 짝을 맞춘다 — 안 그러면 그 사람만 검사가 짧아진다.
+ *   → 9 × 7 = 한 명당 63문항
  *
  * ── 일러스트 ──
- * `background.prompt` 가 이미지 생성용 지시문이다. ART_STYLE 을 앞에 붙여서 생성한다.
+ * `background.prompt` 가 생성 지시문. ART_STYLE 을 앞에 붙여서 만든다.
  * 장면 안에서 특별히 그림이 붙을 문항은 `tags: ['art']` 로 표시한다 (docs/DESIGN.md).
  */
 
@@ -46,8 +54,13 @@ export const ART_STYLE =
   '화면 아래 40%는 글씨가 올라갈 자리라 밝고 단순하게 비워둘 것. ' +
   '채도 낮은 파스텔, 부드러운 빛번짐, 얇은 선.';
 
+/* 걔가 학교에 있는가 — 장면 조건을 한곳에 모아둔다.
+   여기만 고치면 모든 장면이 따라온다. */
+const AT_SCHOOL = { meet: ['class', 'school'] };
+const AWAY = { meet: ['academy', 'outside'] };
+
 export const SCENES: Scene[] = [
-  /* ══ 등교 전 ══════════════════════════════════════════ */
+  /* ══ 등교 전 — 누구에게나 같다 ══════════════════════ */
   {
     id: 'morning',
     title: '아직 아무도 안 만났다',
@@ -67,7 +80,7 @@ export const SCENES: Scene[] = [
       { kind: 'question' },
       { kind: 'question' },
       { kind: 'question' },
-      { kind: 'narration', text: '가방을 메고 나선다.\n오늘도 그 사람을 볼 것이다.' },
+      { kind: 'narration', text: '가방을 메고 나선다.' },
       { kind: 'question' },
       { kind: 'question' },
     ],
@@ -75,10 +88,11 @@ export const SCENES: Scene[] = [
 
   /* ══ 등굣길 ═══════════════════════════════════════════ */
   {
-    id: 'commute',
+    id: 'commute-near',
     title: '저 앞에 보인다',
     label: '오전 7시 50분 · 등굣길',
     slot: 'commute',
+    when: AT_SCHOOL,
     background: {
       src: '/art/scenes/commute.webp',
       alt: '아침 등굣길',
@@ -101,13 +115,39 @@ export const SCENES: Scene[] = [
       { kind: 'question' },
     ],
   },
-
-  /* ══ 학교 ① 교실 ═════════════════════════════════════ */
   {
-    id: 'class',
+    id: 'commute-far',
+    title: '오늘은 못 본다',
+    label: '오전 7시 50분 · 등굣길',
+    slot: 'commute',
+    when: AWAY,
+    background: {
+      src: '/art/scenes/commute.webp',
+      alt: '아침 등굣길',
+      prompt: '아침 등굣길. 교복 입은 학생들이 드문드문 걸어가는 골목. 멀리 학교 정문. 전부 뒷모습.',
+    },
+    cast: [{ who: 'self', x: 46, y: 90 }],
+    beats: [
+      { kind: 'narration', text: '학교로 걸어간다.\n이 길에서 걔를 마주칠 일은 없다.' },
+      { kind: 'question' },
+      { kind: 'question' },
+      { kind: 'narration', text: '대신 폰을 꺼낸다.\n아침에 뭐라도 보내면 이상할까.' },
+      { kind: 'question' },
+      { kind: 'question' },
+      { kind: 'question' },
+      { kind: 'narration', text: '결국 아무것도 안 보내고 주머니에 넣는다.' },
+      { kind: 'question' },
+      { kind: 'question' },
+    ],
+  },
+
+  /* ══ 학교 ① 교실 — 같은 반일 때만 걔가 있다 ═════════ */
+  {
+    id: 'class-same',
     title: '같은 공간, 다른 온도',
     label: '오전 · 교실',
     slot: 'class',
+    when: { meet: 'class' },
     background: {
       src: '/art/scenes/class.webp',
       alt: '1교시 전 교실',
@@ -130,13 +170,39 @@ export const SCENES: Scene[] = [
       { kind: 'question' },
     ],
   },
+  {
+    id: 'class-alone',
+    title: '이 교실엔 걔가 없다',
+    label: '오전 · 교실',
+    slot: 'class',
+    when: { meet: ['school', 'academy', 'outside'] },
+    background: {
+      src: '/art/scenes/class.webp',
+      alt: '1교시 전 교실',
+      prompt: '1교시 전 교실. 창가에 아침 햇빛이 길게 들어온다. 책상 위 펼쳐진 교과서와 필통, 학생들 실루엣.',
+    },
+    cast: [{ who: 'self', x: 50, y: 90 }],
+    beats: [
+      { kind: 'narration', text: '자리에 앉는다.\n이 교실 안에 걔는 없다.' },
+      { kind: 'question' },
+      { kind: 'question' },
+      { kind: 'narration', text: '수업이 시작되고, 창밖을 본다.\n지금 뭐 하고 있을까 같은 걸 생각한다.' },
+      { kind: 'question' },
+      { kind: 'question' },
+      { kind: 'question' },
+      { kind: 'narration', text: '쉬는 시간 10분.\n딱히 갈 데가 없다.' },
+      { kind: 'question' },
+      { kind: 'question' },
+    ],
+  },
 
   /* ══ 학교 ② 급식실 ═══════════════════════════════════ */
   {
-    id: 'lunch',
+    id: 'lunch-near',
     title: '자리가 하나 비어 있다',
     label: '오후 12시 30분 · 급식실',
     slot: 'lunch',
+    when: AT_SCHOOL,
     background: {
       src: '/art/scenes/lunch.webp',
       alt: '점심시간 급식실',
@@ -159,13 +225,39 @@ export const SCENES: Scene[] = [
       { kind: 'question' },
     ],
   },
-
-  /* ══ 학교 ③ 복도·이동수업 ════════════════════════════ */
   {
-    id: 'hall',
+    id: 'lunch-far',
+    title: '얘기로만 아는 사람',
+    label: '오후 12시 30분 · 급식실',
+    slot: 'lunch',
+    when: AWAY,
+    background: {
+      src: '/art/scenes/lunch.webp',
+      alt: '점심시간 급식실',
+      prompt: '점심시간 학교 급식실. 긴 테이블과 식판, 창으로 들어오는 정오의 밝은 빛. 사람들은 뒷모습과 실루엣.',
+    },
+    cast: [{ who: 'self', x: 44, y: 90 }],
+    beats: [
+      { kind: 'narration', text: '친구들이랑 밥을 먹는다.\n여기 있는 애들은 걔를 본 적도 없다.' },
+      { kind: 'question' },
+      { kind: 'question' },
+      { kind: 'line', speaker: '친구', text: '야, 그 사람 사진 있어? 궁금한데.' },
+      { kind: 'question' },
+      { kind: 'question' },
+      { kind: 'question' },
+      { kind: 'narration', text: '우리 학교엔 소문이 안 난다.\n그게 편하기도 하고, 좀 허전하기도 하다.' },
+      { kind: 'question' },
+      { kind: 'question' },
+    ],
+  },
+
+  /* ══ 학교 ③ 복도 ═════════════════════════════════════ */
+  {
+    id: 'hall-near',
     title: '스쳐 지나가는 3초',
     label: '오후 · 복도',
     slot: 'hall',
+    when: AT_SCHOOL,
     background: {
       src: '/art/scenes/hall.webp',
       alt: '오후 학교 복도',
@@ -188,13 +280,39 @@ export const SCENES: Scene[] = [
       { kind: 'question' },
     ],
   },
+  {
+    id: 'hall-far',
+    title: '복도에선 아무 일도 없다',
+    label: '오후 · 복도',
+    slot: 'hall',
+    when: AWAY,
+    background: {
+      src: '/art/scenes/hall.webp',
+      alt: '오후 학교 복도',
+      prompt: '오후 학교 복도. 창으로 길게 들어오는 늦은 햇빛, 사물함이 늘어선 벽. 인적이 드물어 조용하다.',
+    },
+    cast: [{ who: 'self', x: 48, y: 90 }],
+    beats: [
+      { kind: 'narration', text: '이동수업 종이 울린다.\n복도를 지나가는 얼굴 중에 아는 얼굴은 없다.' },
+      { kind: 'question' },
+      { kind: 'question' },
+      { kind: 'narration', text: '여기선 우연히 마주칠 일이 없다.\n뭐든 내가 만들어야 생긴다.' },
+      { kind: 'question' },
+      { kind: 'question' },
+      { kind: 'question' },
+      { kind: 'narration', text: '주머니에서 폰이 한 번 울린다.\n확인하려다 참는다.' },
+      { kind: 'question' },
+      { kind: 'question' },
+    ],
+  },
 
   /* ══ 하교 후 ══════════════════════════════════════════ */
   {
-    id: 'afterschool',
+    id: 'afterschool-near',
     title: '같이 걸을 기회',
     label: '오후 5시 40분 · 하굣길',
     slot: 'afterschool',
+    when: AT_SCHOOL,
     background: {
       src: '/art/scenes/afterschool.webp',
       alt: '노을 지는 하굣길',
@@ -202,7 +320,7 @@ export const SCENES: Scene[] = [
     },
     cast: [
       { who: 'self', x: 42, y: 90 },
-      { who: 'crush', x: 60, y: 90, scale: 1, flip: true },
+      { who: 'crush', x: 60, y: 90, flip: true },
     ],
     beats: [
       { kind: 'narration', text: '교문을 나선다.\n걔가 같은 방향으로 걷는다.' },
@@ -217,8 +335,33 @@ export const SCENES: Scene[] = [
       { kind: 'question' },
     ],
   },
+  {
+    id: 'afterschool-far',
+    title: '만나려면 정해야 한다',
+    label: '오후 5시 40분 · 하교 후',
+    slot: 'afterschool',
+    when: AWAY,
+    background: {
+      src: '/art/scenes/afterschool.webp',
+      alt: '노을 지는 거리',
+      prompt: '노을이 깔린 버스정류장 또는 지하철 입구. 혼자 서 있는 학생의 뒷모습, 긴 그림자. 따뜻한 주황빛.',
+    },
+    cast: [{ who: 'self', x: 50, y: 90 }],
+    beats: [
+      { kind: 'narration', text: '교문을 나선다.\n걔한테 가려면 버스를 타야 한다.' },
+      { kind: 'question' },
+      { kind: 'question' },
+      { kind: 'narration', text: '"오늘 뭐 해?" 한 줄이면 되는데\n그 한 줄이 제일 어렵다.' },
+      { kind: 'question' },
+      { kind: 'question' },
+      { kind: 'question' },
+      { kind: 'narration', text: '우연이 없는 사이는\n누가 먼저 정하지 않으면 아무 일도 안 일어난다.' },
+      { kind: 'question' },
+      { kind: 'question' },
+    ],
+  },
 
-  /* ══ 밤 · 폰 ══════════════════════════════════════════ */
+  /* ══ 밤 · 폰 — 누구에게나 같다 ═══════════════════════ */
   {
     id: 'night',
     title: '읽음 표시는 떴는데',
@@ -244,7 +387,7 @@ export const SCENES: Scene[] = [
     ],
   },
 
-  /* ══ 주말 — 학원에서 보는 사이 ═══════════════════════ */
+  /* ══ 주말 ═════════════════════════════════════════════ */
   {
     id: 'weekend-academy',
     title: '학원 가는 길',
@@ -264,7 +407,7 @@ export const SCENES: Scene[] = [
       { kind: 'narration', text: '주말인데 학원이다.\n대신 여기선 학교에서 못 하던 얘기를 할 수 있다.' },
       { kind: 'question' },
       { kind: 'question' },
-      { kind: 'narration', text: '쉬는 시간에 자판기 앞에서 마주쳤다.\n여기엔 우리 반 애들이 없다.' },
+      { kind: 'narration', text: '쉬는 시간, 자판기 앞에서 마주쳤다.\n여기엔 우리 반 애들이 없다.' },
       { kind: 'question' },
       { kind: 'question' },
       { kind: 'question' },
@@ -273,14 +416,12 @@ export const SCENES: Scene[] = [
       { kind: 'question' },
     ],
   },
-
-  /* ══ 주말 — 그 외 (지문만 다르고 slot·문항 수는 같다) ══ */
   {
     id: 'weekend-out',
-    title: '학교 밖에서 보는 건 처음이다',
+    title: '교복이 아닌 걸 처음 봤다',
     label: '토요일 오후 · 밖',
     slot: 'weekend',
-    when: { meet: '!academy' },
+    when: { meet: ['class', 'school', 'outside'] },
     background: {
       src: '/art/scenes/weekend.webp',
       alt: '주말 오후 번화가',
@@ -304,7 +445,7 @@ export const SCENES: Scene[] = [
     ],
   },
 
-  /* ══ 데이트 ═══════════════════════════════════════════ */
+  /* ══ 데이트 — 누구에게나 같다 ═══════════════════════ */
   {
     id: 'date',
     title: '둘이서만',
@@ -317,7 +458,7 @@ export const SCENES: Scene[] = [
     },
     cast: [
       { who: 'self', x: 44, y: 90 },
-      { who: 'crush', x: 58, y: 90, scale: 1, flip: true },
+      { who: 'crush', x: 58, y: 90, flip: true },
     ],
     beats: [
       { kind: 'narration', text: '둘이서만 있는 시간이 생겼다.\n이제 우연이 아니다.' },

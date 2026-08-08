@@ -94,18 +94,26 @@ export const INTRO: ChoiceQuestion[] = [
     id: 'i-meet',
     kind: 'choice',
     /*
-     * 이 문항이 장면을 좌우한다.
-     * "우리 학교에 그 사람이 있는가" 는 school 과 crush.gender 를 조합해야 알 수 있는데
-     * Condition 은 키를 AND 로만 묶어서 그런 OR 조건을 못 쓴다.
-     * 그래서 유도하지 않고 직접 물어본다. 이쪽이 더 정확하기도 하다 —
-     * 공학이어도 학원에서 만난 사람일 수 있다.
+     * ★ 이 문항이 장면 전체를 좌우한다.
+     *
+     * "우리 학교에 그 사람이 있는가" 를 school + crush.gender 로 유도하려 했는데 안 된다.
+     * 남고라도 상대가 남자면 학교에 있고, 여자면 없다 — 즉 OR 조건이 필요한데
+     * Condition 은 키를 AND 로만 묶는다.
+     *
+     * 그래서 유도하지 않고 **직접 물어서 그 답을 기준으로 삼는다.**
+     * 이러면 school 과 무관하게 항상 일관된다. 정확하기도 하다 —
+     * 공학이어도 학원에서 만난 사람일 수 있으니까.
+     *
+     * 역할 분담:
+     *   meet   → 걔를 어디서 보는가       = **장면**이 갈린다 (scenes.ts 의 when)
+     *   school → 우리 학교가 어떤 곳인가   = **문항 표현**이 갈린다 (문항의 show)
      */
     text: '그 사람은 어디서 마주치는 사이야?\n(아직 없으면, 생긴다면 어디일 것 같아?)',
     options: [
-      { text: '같은 반', traits: { meet: 'class' } },
-      { text: '같은 학교 다른 반', traits: { meet: 'school' } },
-      { text: '학원이나 동아리', traits: { meet: 'academy' } },
-      { text: '학교 밖 · 온라인', traits: { meet: 'outside' } },
+      { text: '같은 반이야', traits: { meet: 'class' } },
+      { text: '같은 학교인데 반은 달라', traits: { meet: 'school' } },
+      { text: '학원이나 동아리에서 봐', traits: { meet: 'academy' } },
+      { text: '학교 밖에서 알게 됐어', traits: { meet: 'outside' } },
     ],
   },
   {
