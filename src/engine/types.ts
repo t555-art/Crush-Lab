@@ -21,6 +21,12 @@ export interface Axis {
   posLabel: string;
   negLabel: string;
   desc?: string;
+  /**
+   * 유형 코드에 쓸 한 글자. 공유 링크와 결과 주소가 이걸로 만들어진다.
+   * 안 적으면 id 첫 글자를 대문자로 쓴다. 축끼리 겹치지 않게 할 것.
+   */
+  posCode?: string;
+  negCode?: string;
 }
 
 export type AxisScore = Record<AxisId, number>;
@@ -73,8 +79,21 @@ interface QuestionBase {
    */
   slots?: string[];
 
-  /** 분류·검색용 자유 태그 */
+  /** 분류·검색용 자유 태그. 장면 배치(`pick.tags`)와 일러스트 표시('art')에 쓴다 */
   tags?: string[];
+
+  /**
+   * 모순 탐지용 묶음 이름.
+   *
+   * 같은 것을 **반대 방향으로 묻는 문항**끼리 같은 이름을 준다.
+   *   "먼저 연락 안 하는 편이야"        pair: 'reach-out'
+   *   "답장 30분 없으면 신경 쓰인다"     pair: 'reach-out'
+   *
+   * 답이 서로 어긋나면 결과지에서 그걸 짚어준다 —
+   * "안 하는 게 아니라 못 하는 거야" 같은 문장이 여기서 나온다.
+   * 유형 판정에는 영향을 주지 않는다.
+   */
+  pair?: string;
 
   /**
    * 출제 조건. 이게 필터링의 핵심이다.
@@ -95,6 +114,16 @@ export interface Choice {
   score?: Partial<AxisScore>;
   /** 이 선택지를 고르면 붙는 특성 */
   traits?: Traits;
+  /**
+   * 하위 지표 태그. 고른 선택지의 것만 집계된다.
+   *
+   * 축으로 만들기엔 다른 축과 상관이 높지만 결과 서술에는 쓰고 싶은 것들을 여기 담는다.
+   *   'mga'        이성 앞 불안 (단성학교 이용자에게 특히 의미 있음)
+   *   'reject'     거절민감성
+   *   'ludus'      가볍게 즐기는 쪽
+   * 유형 판정에는 안 들어간다 — 넣으면 축끼리 상관이 생겨 유형 공간이 접힌다.
+   */
+  tags?: string[];
 }
 
 /**
@@ -229,6 +258,50 @@ export interface ComposedCast extends Omit<CastMember, 'when'> {
  */
 export type Answers = Record<string, number>;
 
+/* ══ 1차 유형 ════════════════════════════════════════════
+   축 전부를 부호로 이어붙이면 2^n 가지가 나오는데, 그건 조합일 뿐이라
+   유형마다 의미가 없다 (MBTI 가 딱 그 수준이다).
+
+   대신 **축 두 개로 사분면을 만들어 1차 유형**을 잡고,
+   나머지 축은 "그게 어떻게 드러나는가" 로 쓴다.
+   같은 1차 유형이어도 나머지 축에 따라 완전히 다른 사람이 된다.
+
+   어떤 축으로 사분면을 만들지는 data/styles.ts 에서 정한다 — 내용 쪽 결정이다. */
+
+export interface StyleDef {
+  id: string;
+  /** '몰입형' */
+  name: string;
+  /** 한 줄 요약 */
+  tag: string;
+  desc?: string;
+  /**
+   * 이 유형이 되는 부호 조합.
+   *   { anxiety: '+', avoid: '-' }   불안 높고 회피 낮으면 이 유형
+   * 여기 적힌 축이 전부 맞아야 한다.
+   */
+  when: Record<AxisId, '+' | '-'>;
+}
+
+/* ══ 모순 ════════════════════════════════════════════════ */
+
+/** 같은 `pair` 를 가진 문항들 사이에서 답이 어긋난 것 */
+export interface Conflict {
+  pair: string;
+  axis: AxisId;
+  /** 어긋난 정도 0~2. 클수록 대놓고 모순 */
+  gap: number;
+  items: {
+    id: string;
+    /** 문항 본문 */
+    text: string;
+    /** 고른 선택지 (슬라이더면 단계 설명) */
+    pick: string;
+    /** 그 문항 안에서의 응답 위치 -1~+1 */
+    pos: number;
+  }[];
+}
+
 /* ══ 채점 결과 ════════════════════════════════════════════ */
 
 export type Strength = 'edge' | 'mild' | 'clear' | 'strong';
@@ -240,4 +313,13 @@ export interface ScoreResult {
   traits: Traits;
   /** 역할별로 몇 문항씩 물었는지 — 결과 신뢰도를 보여줄 때 쓴다 */
   perAspect: Record<string, number>;
+
+  /** 유형 코드. 축 부호를 이어붙인 것 — 공유 링크·결과 주소에 쓴다 */
+  code: string;
+  /** 1차 유형. data/styles.ts 가 비어 있으면 null */
+  style: StyleDef | null;
+  /** 하위 지표 집계. 고른 선택지의 tags 를 센 것 */
+  tags: Record<string, number>;
+  /** 서로 어긋난 답변. 결과지의 "솔직히 말하면" 에 쓴다 */
+  conflicts: Conflict[];
 }

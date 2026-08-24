@@ -1,31 +1,141 @@
 import type { ChoiceQuestion } from '../engine/types';
 
 /**
- * 시작 질문 — 응답자가 어떤 사람인지 알아보는 부분.
+ * 시작 질문 — 성향을 재는 게 아니라 **뒤에 쓸 정보를 모으는 곳**이다.
+ * 그래서 선택지에 `score` 가 없고 `traits` 만 있다.
  *
- * ⚠️ 비어 있다.
+ * ── 이 아홉 개가 짊어지는 일 ──
+ * 엔진은 검사 **도중에는** 특성을 안 쌓는다. `resolve()` 가 스토리 시작 전에
+ * 한 번만 돌고, 스토리 문항의 `traits` 는 반영되지 않는다.
+ * 그래서 **모든 분기가 여기서 결정된다.** 문항 300~400개 중
+ * 누구에게 무엇이 나갈지가 이 아홉 개의 답으로 갈린다.
  *
- * 본 검사와 성격이 다르다. 여기는 성향을 재는 게 아니라
- * **뒤에 쓸 정보를 모으는 곳**이다.
+ * ── 순서 ──
+ * 아바타가 눈에 띄게 변하는 것부터 (성별 → 체형 → 머리 → 분위기).
+ * 첫 질문에 답했는데 그림이 그대로면 "답할수록 그려진다" 가 첫판부터 죽는다.
+ * 뒤쪽 다섯 개는 그림이 아니라 **분기**를 위한 것이다.
  *
- *   · 아바타를 그리는 재료      (traits 로 쌓인다)
- *   · 좋아하는 상대 묘사의 분기  (traits)
- *   · 어떤 문항을 낼지 거르는 조건 (show)
+ * ── 조합 수 ──  ★ 여기 손댈 때 반드시 계산할 것
+ * check-coverage 가 모든 선택지 조합을 전수로 돈다. 상한이 20,000이고
+ * 넘으면 앞에서부터 잘라서 검사하는데, 조합이 중첩 곱으로 만들어지기 때문에
+ * 잘린 표본은 **앞쪽 질문의 답이 전부 같다** — 남자 분기만 검사하고
+ * 여자 분기는 한 번도 안 보는 상태가 된다.
  *
- * 그래서 선택지마다 `traits` 를 붙인다. 축 점수(`score`)는 보통 없다.
+ *   2 × 3 × 3 × 3 × 3 × 2 × 4 × 5 × 3 = 19,440   ← 지금. 상한 아슬아슬
  *
- * 답할 때마다 아바타가 한 겹씩 그려지는 연출이 붙을 자리다.
- * 문항 순서 = 아바타가 완성되는 순서이므로, 큰 것부터 물어보는 게 자연스럽다.
- * (성별 → 머리 → 분위기 → 성격 …)
- *
- * 예시 (지우고 새로 쓸 것):
- *
- *   {
- *     id: 'gender', kind: 'choice', text: '너는?',
- *     options: [
- *       { text: '남자', traits: { gender: 'm' } },
- *       { text: '여자', traits: { gender: 'f' } },
- *     ],
- *   },
+ * 여유가 없다. 분기를 더 늘리려면 코드 쪽에 요청해둔 두 가지 중 하나가 필요하다
+ * (docs/PROGRESS.md 참고) — 무작위 표본으로 바꾸거나,
+ * show/when 에 실제로 쓰이는 키만 곱하거나. 후자면 720조합으로 떨어진다.
  */
-export const INTRO: ChoiceQuestion[] = [];
+export const INTRO: ChoiceQuestion[] = [
+  /* ── 아바타가 그려지는 구간 ─────────────────────────── */
+  {
+    id: 'i-gender',
+    kind: 'choice',
+    text: '너는?',
+    options: [
+      { text: '남자', traits: { gender: 'm' } },
+      { text: '여자', traits: { gender: 'f' } },
+    ],
+  },
+  {
+    id: 'i-build',
+    kind: 'choice',
+    text: '체형은 어느 쪽에 가까워?',
+    options: [
+      { text: '마른 편', traits: { build: 'slim' } },
+      { text: '보통', traits: { build: 'mid' } },
+      { text: '덩치 있는 편', traits: { build: 'big' } },
+    ],
+  },
+  {
+    id: 'i-hair',
+    kind: 'choice',
+    text: '머리는?',
+    options: [
+      { text: '짧아', traits: { hair: 'short' } },
+      { text: '어깨쯤', traits: { hair: 'mid' } },
+      { text: '길어', traits: { hair: 'long' } },
+    ],
+  },
+  {
+    id: 'i-vibe',
+    kind: 'choice',
+    text: '남들이 너를 처음 봤을 때 하는 말에 제일 가까운 건?',
+    options: [
+      { text: '"밝다" / "말 많다"', traits: { vibe: 'bright' } },
+      { text: '"조용하다" / "차분하다"', traits: { vibe: 'quiet' } },
+      { text: '"무슨 생각인지 모르겠다"', traits: { vibe: 'blank' } },
+    ],
+  },
+
+  /* ── 분기를 만드는 구간 ─────────────────────────────── */
+  {
+    id: 'i-school',
+    kind: 'choice',
+    text: '학교는 어떤 곳이야?',
+    options: [
+      { text: '남녀공학', traits: { school: 'co' } },
+      { text: '남고', traits: { school: 'boys' } },
+      { text: '여고', traits: { school: 'girls' } },
+    ],
+  },
+  {
+    id: 'i-crush-gender',
+    kind: 'choice',
+    // 지금 좋아하는 사람이 없어도 답할 수 있게 '마음이 가는 쪽' 으로 물어본다
+    text: '마음이 가는 쪽은?',
+    options: [
+      { text: '남자', traits: { 'crush.gender': 'm' } },
+      { text: '여자', traits: { 'crush.gender': 'f' } },
+    ],
+  },
+  {
+    id: 'i-meet',
+    kind: 'choice',
+    /*
+     * ★ 이 문항이 장면 전체를 좌우한다.
+     *
+     * "우리 학교에 그 사람이 있는가" 를 school + crush.gender 로 유도하려 했는데 안 된다.
+     * 남고라도 상대가 남자면 학교에 있고, 여자면 없다 — 즉 OR 조건이 필요한데
+     * Condition 은 키를 AND 로만 묶는다.
+     *
+     * 그래서 유도하지 않고 **직접 물어서 그 답을 기준으로 삼는다.**
+     * 이러면 school 과 무관하게 항상 일관된다. 정확하기도 하다 —
+     * 공학이어도 학원에서 만난 사람일 수 있으니까.
+     *
+     * 역할 분담:
+     *   meet   → 걔를 어디서 보는가       = **장면**이 갈린다 (scenes.ts 의 when)
+     *   school → 우리 학교가 어떤 곳인가   = **문항 표현**이 갈린다 (문항의 show)
+     */
+    text: '그 사람은 어디서 마주치는 사이야?\n(아직 없으면, 생긴다면 어디일 것 같아?)',
+    options: [
+      { text: '같은 반이야', traits: { meet: 'class' } },
+      { text: '같은 학교인데 반은 달라', traits: { meet: 'school' } },
+      { text: '학원이나 동아리에서 봐', traits: { meet: 'academy' } },
+      { text: '학교 밖에서 알게 됐어', traits: { meet: 'outside' } },
+    ],
+  },
+  {
+    id: 'i-status',
+    kind: 'choice',
+    text: '지금은 어떤 상태야?',
+    options: [
+      { text: '좋아하는 사람이 있어', traits: { status: 'crush' } },
+      { text: '썸 타는 중', traits: { status: 'some' } },
+      { text: '사귀는 중', traits: { status: 'dating' } },
+      { text: '헤어진 지 얼마 안 됐어', traits: { status: 'broke' } },
+      { text: '아무도 없어', traits: { status: 'none' } },
+    ],
+  },
+  {
+    id: 'i-exp',
+    kind: 'choice',
+    text: '지금까지 연애는?',
+    options: [
+      { text: '해본 적 없어', traits: { exp: 'none' } },
+      { text: '한두 번', traits: { exp: 'few' } },
+      { text: '여러 번', traits: { exp: 'many' } },
+    ],
+  },
+];
