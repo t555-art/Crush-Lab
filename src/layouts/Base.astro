@@ -19,6 +19,9 @@ const {
 
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const ogImage = new URL(image, Astro.site);
+
+/** Cloudflare 대시보드에서 받은 토큰. 없으면 측정 스크립트를 안 붙인다 */
+const beacon = import.meta.env.PUBLIC_CF_BEACON_TOKEN;
 ---
 <!doctype html>
 <html lang="ko">
@@ -39,6 +42,17 @@ const ogImage = new URL(image, Astro.site);
 
   <meta name="theme-color" content="#FBFAF9" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="sitemap" href="/sitemap-index.xml" />
+
+  {/*
+    방문 측정 (Cloudflare Web Analytics — 무료, 쿠키 없음).
+    토큰이 있을 때만 붙는다. 없으면 아무것도 로드하지 않는다.
+    켜는 법은 docs/CLOUDFLARE.md 참고.
+  */}
+  {beacon && (
+    <script defer src="https://static.cloudflareinsights.com/beacon.min.js"
+            data-cf-beacon={`{"token":"${beacon}"}`}></script>
+  )}
 </head>
 <body>
   <div class="app" data-fixed={fixed ? '' : undefined}>

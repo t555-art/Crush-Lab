@@ -11,9 +11,12 @@
     "build": "astro build",
     "preview": "astro preview --host",
     "check": "astro check",
-    "check:questions": "node tools/check-coverage.mjs"
+    "check:questions": "node tools/check-coverage.mjs",
+    "art:guide": "node tools/make-art-guide.mjs",
+    "check:art": "node tools/check-art.mjs"
   },
   "dependencies": {
+    "@astrojs/sitemap": "^3.7.3",
     "astro": "^5.14.1"
   },
   "devDependencies": {
